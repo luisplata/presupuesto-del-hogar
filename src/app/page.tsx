@@ -25,8 +25,12 @@ export default function Home() {
 
   const handleDeleteExpense = (idToDelete: string) => {
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.id !== idToDelete));
-    // Optionally show a toast confirmation for deletion
-    // toast({ title: "Gasto eliminado" });
+    // Toast confirmation is handled within ExpenseList now
+  };
+
+  const handleDeleteProduct = (productNameToDelete: string) => {
+    setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product !== productNameToDelete));
+     // Toast confirmation is handled within ExpenseList now
   };
 
 
@@ -44,7 +48,12 @@ export default function Home() {
 
         <div className="md:col-span-2 space-y-6">
            <ExpenseSummary expenses={expenses} />
-           <ProductHistory expenses={expenses} onDeleteExpense={handleDeleteExpense} /> {/* Pass delete handler */}
+           {/* Pass both delete handlers to ProductHistory */}
+           <ProductHistory
+             expenses={expenses}
+             onDeleteExpense={handleDeleteExpense}
+             onDeleteProduct={handleDeleteProduct}
+            />
         </div>
        </div>
 

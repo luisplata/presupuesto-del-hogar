@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 
 interface ProductHistoryProps {
   expenses: Expense[];
-  onDeleteExpense: (id: string) => void; // Add prop for delete handler
+  onDeleteExpense: (id: string) => void;
+  onDeleteProduct: (productName: string) => void; // Add prop for product delete handler
 }
 
 // Helper to get unique products including 'all'
@@ -29,7 +30,7 @@ const filterExpenses = (expenses: Expense[], selectedProduct: string): Expense[]
   return expenses.filter(expense => expense.product === selectedProduct);
 };
 
-export function ProductHistory({ expenses, onDeleteExpense }: ProductHistoryProps) {
+export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct }: ProductHistoryProps) {
   // State for the currently selected product in the dropdown
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
 
@@ -75,7 +76,8 @@ export function ProductHistory({ expenses, onDeleteExpense }: ProductHistoryProp
         {/* Display the list of expenses, filtered based on the selection */}
         <ExpenseList
             expenses={filteredExpenses}
-            onDeleteExpense={onDeleteExpense} // Pass delete handler down
+            onDeleteExpense={onDeleteExpense} // Pass expense delete handler down
+            onDeleteProduct={selectedProduct !== 'all' ? onDeleteProduct : undefined} // Pass product delete handler only when a specific product is selected
             // Dynamic title and caption based on the selected product
             title={selectedProduct === 'all' ? "Historial Completo" : `Historial de ${selectedProduct}`}
             caption={selectedProduct === 'all' ? "Todos los gastos registrados." : `Gastos registrados para ${selectedProduct}.`}
