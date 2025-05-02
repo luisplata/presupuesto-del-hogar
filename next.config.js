@@ -1,14 +1,14 @@
 
-const repoName = process.env.REPO_NAME || '';
+/** @type {import('next').NextConfig} */
+const isGithub = process.env.REPO_NAME && process.env.REPO_NAME !== '';
+
 const isProd = process.env.NODE_ENV === 'production';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export', // Essential for static export
-  // Set base path only for production builds on GitHub Pages
-  basePath: isProd ? `/${repoName}` : undefined,
-  // Set asset prefix only for production builds on GitHub Pages
-  assetPrefix: isProd ? `/${repoName}/` : undefined,
+  output: 'export',
+  basePath: isGithub ? `/${process.env.REPO_NAME}` : '', // si REPO_NAME está vacío, no pone basePath
+  assetPrefix: isGithub ? `/${process.env.REPO_NAME}/` : '', // lo mismo para los assets
   trailingSlash: true, // Ensures /page loads /page/index.html, good for static hosts
   images: {
     unoptimized: true, // Required for next export
