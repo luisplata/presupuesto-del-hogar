@@ -1,7 +1,7 @@
 
 import { Html, Head, Main, NextScript } from 'next/document';
 import type { DocumentProps } from 'next/document';
-import nextConfig from '../../next.config.js'; // Import config to access basePath
+import nextConfig from '../next.config.js'; // Corrected import path
 
 // Using default DocumentProps is usually sufficient
 export default function Document(props: DocumentProps) {
@@ -40,3 +40,4 @@ export default function Document(props: DocumentProps) {
     </Html>
   );
 }
+

@@ -17,13 +17,23 @@ To get started, take a look at `pages/index.tsx`.
     ```
     Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+    **Important:** The `basePath` (`/presupuesto-del-hogar`) is **not** applied during local development (`npm run dev`). Access the site directly at the root URL (`http://localhost:3000`).
+
 ## Building for Production (Static Export)
 
 ```bash
 npm run build
 ```
 
-This command will build the application and export it as static HTML/CSS/JS files into the `out` directory.
+This command will build the application and export it as static HTML/CSS/JS files into the `out` directory. The `basePath` and `assetPrefix` configuration in `next.config.js` will be applied during this build process, setting the base path to `/presupuesto-del-hogar/`.
+
+### Testing the Static Build Locally
+
+After running `npm run build`, you can test the static output:
+
+1.  Install a simple HTTP server if you don't have one: `npm install -g serve`
+2.  Serve the `out` directory: `npx serve out`
+3.  Access the site **with the base path**: Open [http://localhost:3000/presupuesto-del-hogar/](http://localhost:3000/presupuesto-del-hogar/) (or the port `serve` indicates). Accessing just `http://localhost:3000/` will likely result in a 404 error because the site is built to live under the `/presupuesto-del-hogar/` path.
 
 ## Deployment to GitHub Pages
 
@@ -40,16 +50,17 @@ This project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`)
 
 *   On push to `main`, the workflow runs.
 *   It checks out the code, installs dependencies, and runs `npm run build`.
-*   The `build` script executes `next build && next export`, generating the static site in the `out` folder.
+*   The `build` script executes `next build && next export`, generating the static site in the `out` folder with the correct `basePath`.
 *   The workflow then pushes the contents of the `out` folder to the `gh-pages` branch.
 *   GitHub Pages serves the site from the `gh-pages` branch.
 
-Your deployed site will be available at `https://<your-username>.github.io/<your-repo-name>/`. Make sure the `homepage` field in `package.json` and the `basePath`/`assetPrefix` in `next.config.js` match this URL structure.
+Your deployed site will be available at `https://<your-username>.github.io/presupuesto-del-hogar/`. Make sure the `homepage` field in `package.json` and the `basePath`/`assetPrefix` in `next.config.js` match this URL structure. Accessing `https://<your-username>.github.io/` directly will likely result in a 404.
 
-**Note on 502 Errors and Routing Issues in Development:**
+## Troubleshooting
 
-*   You might occasionally see `502 (Bad Gateway)` errors for requests like `/` or `/favicon.ico` in the browser console during development, especially in cloud-based IDEs. These are often related to the development server or proxy setup within the IDE environment and may not indicate an issue with the application code itself.
-*   If the application generally loads and functions, these can sometimes be ignored.
-*   **Troubleshooting:** If you experience persistent 502 errors or routing problems during local development (`npm run dev`), ensure that `basePath` and `assetPrefix` in `next.config.js` are conditionally applied (e.g., only `process.env.NODE_ENV === 'production'`) or commented out for local development. These settings are essential for deployment but can interfere with the development server. Remember they are needed for the production build (`npm run build`).
-*   Persistent issues might require restarting the development server or checking the IDE/environment configuration.
+*   **404 Error at Root (`/`) after Build/Deploy:** This is expected behavior when a `basePath` is configured. Access the site using the full path including the `basePath` (e.g., `/presupuesto-del-hogar/`).
+*   **502/404 Errors during `npm run dev`:** You might occasionally see `502 (Bad Gateway)` or `404 (Not Found)` errors for requests like `/` or `/favicon.ico` in the browser console during development (`npm run dev`), especially in cloud-based IDEs (like IDX). These are often related to the development server or proxy setup within the IDE environment and may not indicate an issue with the application code itself.
+    *   If the application generally loads and functions at `http://localhost:3000`, these errors can sometimes be ignored.
+    *   The `basePath` is *not* applied in development mode due to the conditional logic in `next.config.js`, so it shouldn't be the cause of 404s at the root during `npm run dev`.
+    *   Persistent issues might require restarting the development server (`Ctrl+C` and `npm run dev` again) or checking the IDE/environment configuration. Ensure you are accessing `http://localhost:3000` and not `http://localhost:3000/presupuesto-del-hogar/` during development.
 ```
