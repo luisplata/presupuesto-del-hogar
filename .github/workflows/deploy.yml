@@ -20,11 +20,10 @@ jobs:
       - name: Install dependencies
         run: npm ci # Use npm ci for clean installs
 
-      - name: Export Next.js app
-        run: npm run export
+      - name: Build Next.js app
+        run: npm run build
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: .next
-          token: ${{ secrets.ACCESS_TOKEN }}
+          folder: out
