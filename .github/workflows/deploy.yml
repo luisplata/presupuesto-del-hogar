@@ -20,22 +20,10 @@ jobs:
       - name: Install dependencies
         run: npm ci # Use npm ci for clean installs
 
-      - name: Create build directory
-        run: mkdir build
-      
-      - name: Create out directory in build
-        run: mkdir build/out
-
       - name: Build Next.js app
         run: npm run build
         env:
           NODE_ENV: 'production'
-
-      - name: move the out to build
-        run: mv out/* build/out
-
-      - name: Copy manifest
-        run: cp public/manifest.json build || true
       
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
