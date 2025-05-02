@@ -29,8 +29,8 @@ export function ProductHistory({ expenses }: ProductHistoryProps) {
     return expenses.filter(expense => expense.product === selectedProduct);
   }, [expenses, selectedProduct]);
 
+  // Correctly handle the change from the Select component
   const handleProductChange = (value: string) => {
-    // Directly set the selected value
     setSelectedProduct(value);
   };
 
@@ -45,6 +45,7 @@ export function ProductHistory({ expenses }: ProductHistoryProps) {
         <div>
           <Label htmlFor="product-select">Seleccionar Producto:</Label>
           {/* Pass selectedProduct directly as the value */}
+          {/* Use the handleProductChange handler */}
           <Select onValueChange={handleProductChange} value={selectedProduct}>
             <SelectTrigger id="product-select" className="w-full md:w-[280px] mt-1">
               {/* Ensure SelectValue displays the correct placeholder/value */}
