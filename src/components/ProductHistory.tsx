@@ -2,7 +2,7 @@
 "use client";
 
 import type { Expense } from '@/types/expense';
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react'; // Import React and useCallback
 import { ExpenseList } from './ExpenseList';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,29 +12,40 @@ interface ProductHistoryProps {
   expenses: Expense[];
 }
 
+// Helper to get unique products including 'all'
+const getUniqueProducts = (expenses: Expense[]): string[] => {
+  const products = new Set(expenses.map(e => e.product));
+  // Ensure 'all' is always an option and products are sorted
+  return ['all', ...Array.from(products).sort()];
+};
+
+// Helper to filter expenses based on the selected product
+const filterExpenses = (expenses: Expense[], selectedProduct: string): Expense[] => {
+  if (selectedProduct === 'all') {
+    return expenses; // Return all expenses if 'all' is selected
+  }
+  // Otherwise, filter by the specific product
+  return expenses.filter(expense => expense.product === selectedProduct);
+};
+
 export function ProductHistory({ expenses }: ProductHistoryProps) {
-  // Use 'all' as the default state value instead of undefined
+  // State for the currently selected product in the dropdown
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
 
-  const uniqueProducts = useMemo(() => {
-    const products = new Set(expenses.map(e => e.product));
-    return Array.from(products).sort(); // Sort products alphabetically
-  }, [expenses]);
+  // Memoize the list of unique products to avoid recalculation unless expenses change
+  const uniqueProducts = useMemo(() => getUniqueProducts(expenses), [expenses]);
 
-  const filteredExpenses = useMemo(() => {
-    // Check against 'all' directly
-    if (selectedProduct === 'all') {
-      return expenses;
+  // Memoize the filtered list of expenses based on the selected product and expenses array
+  const filteredExpenses = useMemo(() => filterExpenses(expenses, selectedProduct), [expenses, selectedProduct]);
+
+  // Memoize the handler function for the Select component's onValueChange event
+  // This prevents the function from being recreated on every render
+  const handleProductChange = useCallback((value: string) => {
+    // Check if the value is valid before updating state
+    if (value !== undefined && value !== null) {
+       setSelectedProduct(value);
     }
-    return expenses.filter(expense => expense.product === selectedProduct);
-  }, [expenses, selectedProduct]);
-
-  // Correctly handle the change from the Select component
-  const handleProductChange = (value: string) => {
-    setSelectedProduct(value);
-  };
-
-  const displayProduct = selectedProduct === 'all' ? 'Todos los Productos' : selectedProduct;
+  }, []); // The dependency array is empty because setSelectedProduct itself is stable
 
   return (
     <Card>
@@ -44,27 +55,28 @@ export function ProductHistory({ expenses }: ProductHistoryProps) {
       <CardContent className="space-y-4">
         <div>
           <Label htmlFor="product-select">Seleccionar Producto:</Label>
-          {/* Pass selectedProduct directly as the value */}
-          {/* Use the handleProductChange handler */}
+          {/* Select component controlled by selectedProduct state */}
           <Select onValueChange={handleProductChange} value={selectedProduct}>
             <SelectTrigger id="product-select" className="w-full md:w-[280px] mt-1">
-              {/* Ensure SelectValue displays the correct placeholder/value */}
-              <SelectValue placeholder="Todos los Productos" />
+              {/* Displays the current value or a placeholder */}
+              <SelectValue placeholder="Seleccionar Producto" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todos los Productos</SelectItem>
+              {/* Map through unique products to create SelectItem options */}
               {uniqueProducts.map(product => (
                 <SelectItem key={product} value={product}>
-                  {product}
+                  {/* Display 'Todos los Productos' for the 'all' value */}
+                  {product === 'all' ? 'Todos los Productos' : product}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
+        {/* Display the list of expenses, filtered based on the selection */}
         <ExpenseList
             expenses={filteredExpenses}
-            // Adjust title and caption based on 'all'
+            // Dynamic title and caption based on the selected product
             title={selectedProduct === 'all' ? "Historial Completo" : `Historial de ${selectedProduct}`}
             caption={selectedProduct === 'all' ? "Todos los gastos registrados." : `Gastos registrados para ${selectedProduct}.`}
         />
