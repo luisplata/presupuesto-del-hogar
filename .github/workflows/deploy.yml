@@ -23,9 +23,6 @@ jobs:
       - name: Build Next.js app
         run: npm run build
 
-      - name: Move _next to the root
-        run: mv out/_next/* out
-
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:

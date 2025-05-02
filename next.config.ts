@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'export',
-  assetPrefix: '/presupuesto-del-hogar/_next/', // Modify this line
+  assetPrefix: '/presupuesto-del-hogar/', // Modify this line
   typescript: {
     ignoreBuildErrors: true,
   },
