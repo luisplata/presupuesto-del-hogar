@@ -4,10 +4,10 @@ import type { NextConfig } from 'next';
 const repoName = 'presupuesto-del-hogar'; // 🚨 Ajusta esto si tu repo es otro (ej: "mi-app")
 
 const nextConfig: NextConfig = {
-  // output: 'export', // Removed for Pages Router export via script
+  // output: 'export', // Keep commented out - 'npm run export' handles this
   basePath: `/${repoName}`,
-  assetPrefix: `/${repoName}/`,
-  trailingSlash: true,
+  assetPrefix: `/${repoName}/`, // Ensure assetPrefix matches basePath for consistency
+  trailingSlash: true, // Important for static export compatibility with some servers
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -25,6 +25,9 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Recommended: Add reactStrictMode
+  reactStrictMode: true,
 };
 
 export default nextConfig;
+

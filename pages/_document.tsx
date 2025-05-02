@@ -3,26 +3,28 @@ import { Html, Head, Main, NextScript } from 'next/document';
 import type { DocumentProps } from 'next/document';
 import type { AppProps } from 'next/app';
 
-// Define AppPropsWithBasePath by extending AppProps
-interface AppPropsWithBasePath extends AppProps {
-  router: {
-    basePath: string;
-  };
-}
+// Define AppPropsWithBasePath by extending AppProps - This might not be necessary
+// as basePath is typically handled by Next.js automatically based on config.
+// interface AppPropsWithBasePath extends AppProps {
+//   router: {
+//     basePath: string;
+//   };
+// }
 
 // Extend DocumentProps to potentially include router if passed down, though typically not needed directly here
-interface MyDocumentProps extends DocumentProps {
-    __NEXT_DATA__: { // Access __NEXT_DATA__ for basePath
-        assetPrefix?: string; // assetPrefix usually reflects basePath configuration
-        // You might need to find the exact property holding basePath if assetPrefix isn't it
-    };
-}
+// interface MyDocumentProps extends DocumentProps {
+//     __NEXT_DATA__: { // Access __NEXT_DATA__ for basePath
+//         assetPrefix?: string; // assetPrefix usually reflects basePath configuration
+//         // You might need to find the exact property holding basePath if assetPrefix isn't it
+//     };
+// }
 
 
-export default function Document(props: MyDocumentProps) {
-    // Attempt to derive basePath. This might be tricky in _document.
-    // Using a fixed path based on next.config.js might be more reliable for static export.
-    const basePath = '/presupuesto-del-hogar'; // Hardcoded based on next.config.ts
+// Using default DocumentProps is usually sufficient
+export default function Document(props: DocumentProps) {
+    // basePath is automatically handled by Next.js when using relative paths
+    // or the Link component/router. Manually constructing it here can be error-prone.
+    // const basePath = '/presupuesto-del-hogar'; // Removed hardcoded basePath
 
   return (
     <Html lang="en">
@@ -37,14 +39,19 @@ export default function Document(props: MyDocumentProps) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="theme-color" content="#008080" />
 
-        {/* Link to manifest.json using basePath */}
-        <link rel="manifest" href={`${basePath}/manifest.json`} />
+        {/* Link to manifest.json - Relative path correctly handles basePath */}
+        <link rel="manifest" href="./manifest.json" />
 
-        {/* Placeholder Icons (replace with actual paths if available, consider basePath) */}
+        {/* Favicon/Icons: Browsers often request /favicon.ico by default.
+            The PWA manifest references icons in /icons/. Ensure these exist
+            if you uncomment the apple-touch-icon links or want PWA functionality.
+            No need to add a specific link for favicon.ico unless you have one
+            at a non-standard location. The 502 error for favicon.ico likely
+            indicates a server/proxy issue, not a missing link tag. */}
         {/*
-        <link rel="apple-touch-icon" sizes="180x180" href={`${basePath}/icons/apple-touch-icon.png`} />
-        <link rel="icon" type="image/png" sizes="32x32" href={`${basePath}/icons/favicon-32x32.png`} />
-        <link rel="icon" type="image/png" sizes="16x16" href={`${basePath}/icons/favicon-16x16.png`} />
+        <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="./icons/favicon-16x16.png" />
         */}
 
       </Head>
@@ -55,3 +62,4 @@ export default function Document(props: MyDocumentProps) {
     </Html>
   );
 }
+
