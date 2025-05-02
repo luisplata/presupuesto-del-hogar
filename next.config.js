@@ -1,5 +1,5 @@
 
-const repoName = process.env.REPO_NAME || 'presupuesto-del-hogar';
+const repoName = process.env.REPO_NAME || '';
 const isProd = process.env.NODE_ENV === 'production';
 
 /** @type {import('next').NextConfig} */
