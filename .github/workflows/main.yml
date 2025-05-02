@@ -23,10 +23,11 @@ jobs:
         run: |
           echo "REACT_APP_API_BASE_URL=${{ secrets.REACT_APP_API_BASE_URL }}" >> .env
           echo "REACT_APP_MEDIA_BASE_URL=${{ secrets.REACT_APP_MEDIA_BASE_URL }}" >> .env
+          echo "REPO_NAME=" >> .env  # Aquí no definimos ningún valor para REPO_NAME, lo dejamos vacío
 
-      - name: ⚙️ Construir la aplicación
-        run: CI=false npm run build
-
+      - name: ⚙️ Construir la aplicación con exportación estática
+        run: CI=false npm run build && npm run export  # Establecer REPO_NAME vacío
+        
       - name: 🔍 Verificar si la carpeta out existe
         run: ls -la out
 
