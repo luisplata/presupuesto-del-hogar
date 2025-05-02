@@ -2,7 +2,7 @@
 "use client";
 
 import type { Expense } from '@/types/expense';
-import React, { useState, useMemo, useCallback } from 'react'; // Import React and useCallback
+import React, { useState, useMemo, useCallback } from 'react';
 import { ExpenseList } from './ExpenseList';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 
 interface ProductHistoryProps {
   expenses: Expense[];
+  onDeleteExpense: (id: string) => void; // Add prop for delete handler
 }
 
 // Helper to get unique products including 'all'
@@ -28,7 +29,7 @@ const filterExpenses = (expenses: Expense[], selectedProduct: string): Expense[]
   return expenses.filter(expense => expense.product === selectedProduct);
 };
 
-export function ProductHistory({ expenses }: ProductHistoryProps) {
+export function ProductHistory({ expenses, onDeleteExpense }: ProductHistoryProps) {
   // State for the currently selected product in the dropdown
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
 
@@ -39,13 +40,11 @@ export function ProductHistory({ expenses }: ProductHistoryProps) {
   const filteredExpenses = useMemo(() => filterExpenses(expenses, selectedProduct), [expenses, selectedProduct]);
 
   // Memoize the handler function for the Select component's onValueChange event
-  // This prevents the function from being recreated on every render
-  const handleProductChange = useCallback((value: string) => {
-    // Check if the value is valid before updating state
-    if (value !== undefined && value !== null) {
-       setSelectedProduct(value);
-    }
-  }, []); // The dependency array is empty because setSelectedProduct itself is stable
+  const handleProductChange = useCallback((value: string | undefined) => {
+     if (value !== undefined) {
+        setSelectedProduct(value);
+     }
+  }, []);
 
   return (
     <Card>
@@ -76,6 +75,7 @@ export function ProductHistory({ expenses }: ProductHistoryProps) {
         {/* Display the list of expenses, filtered based on the selection */}
         <ExpenseList
             expenses={filteredExpenses}
+            onDeleteExpense={onDeleteExpense} // Pass delete handler down
             // Dynamic title and caption based on the selected product
             title={selectedProduct === 'all' ? "Historial Completo" : `Historial de ${selectedProduct}`}
             caption={selectedProduct === 'all' ? "Todos los gastos registrados." : `Gastos registrados para ${selectedProduct}.`}

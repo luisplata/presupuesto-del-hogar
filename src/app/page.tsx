@@ -17,11 +17,16 @@ export default function Home() {
   const handleAddExpense = (newExpenseData: Omit<Expense, 'id' | 'timestamp'>) => {
     const newExpense: Expense = {
       ...newExpenseData,
-      // Consider using a more robust ID generation method if needed, e.g., uuid
       id: uuidv4(), // Generate a unique ID using uuid
       timestamp: new Date(), // Record the current timestamp
     };
     setExpenses(prevExpenses => [...prevExpenses, newExpense]);
+  };
+
+  const handleDeleteExpense = (idToDelete: string) => {
+    setExpenses(prevExpenses => prevExpenses.filter(expense => expense.id !== idToDelete));
+    // Optionally show a toast confirmation for deletion
+    // toast({ title: "Gasto eliminado" });
   };
 
 
@@ -39,7 +44,7 @@ export default function Home() {
 
         <div className="md:col-span-2 space-y-6">
            <ExpenseSummary expenses={expenses} />
-           <ProductHistory expenses={expenses} />
+           <ProductHistory expenses={expenses} onDeleteExpense={handleDeleteExpense} /> {/* Pass delete handler */}
         </div>
        </div>
 
