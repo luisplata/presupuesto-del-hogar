@@ -21,7 +21,7 @@ jobs:
 
       - name: 📄 Crear archivo .env desde los secretos
         run: |
-          echo "REPO_NAME=/" >> .env  # Aquí no definimos ningún valor para REPO_NAME, lo dejamos vacío
+          echo "REPO_NAME=" >> .env  # Aquí no definimos ningún valor para REPO_NAME, lo dejamos vacío
 
       - name: ⚙️ Construir la aplicación (Next.js export automático)
         run: npm run build
