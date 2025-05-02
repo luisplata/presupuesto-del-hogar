@@ -1,11 +1,13 @@
 
 import { Html, Head, Main, NextScript } from 'next/document';
 import type { DocumentProps } from 'next/document';
+import nextConfig from '../../next.config.js'; // Import config to access basePath
 
 // Using default DocumentProps is usually sufficient
 export default function Document(props: DocumentProps) {
-    // basePath is automatically handled by Next.js when using relative paths
-    // or the Link component/router.
+  // Determine the correct path for the manifest based on environment
+  const basePath = nextConfig.basePath || '';
+  const manifestPath = `${basePath}/manifest.json`;
 
   return (
     <Html lang="en">
@@ -18,15 +20,17 @@ export default function Document(props: DocumentProps) {
         <meta name="description" content="Track your expenses easily." />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="theme-color" content="#008080" />
+        <meta name="theme-color" content="#008080" /> {/* Match theme color in globals.css or manifest */}
 
-        {/* Link to manifest.json - Relative path correctly handles basePath */}
+        {/* Link to manifest.json - Use the dynamically generated path */}
         {/* Ensure manifest.json exists in the public folder */}
-        <link rel="manifest" href="./manifest.json" />
+        <link rel="manifest" href={manifestPath} />
 
         {/* Favicon: Browsers usually look for /favicon.ico by default.
-            Ensure a favicon.ico exists in your public folder.
-            The 502 error suggests a server/proxy issue when fetching it. */}
+            Place favicon.ico in the public folder.
+            Next.js with basePath handles the path correctly if placed in /public. */}
+        {/* Example explicit link (usually not needed if /public/favicon.ico exists): */}
+        {/* <link rel="icon" href={`${basePath}/favicon.ico`} /> */}
 
       </Head>
       <body>

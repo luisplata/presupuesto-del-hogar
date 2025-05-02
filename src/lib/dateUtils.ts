@@ -1,3 +1,4 @@
+
 import {
   startOfWeek,
   endOfWeek,
@@ -8,19 +9,30 @@ import {
   isValid,
   startOfDay,
   endOfDay,
+  format, // Import format for better control
 } from 'date-fns';
+import { es } from 'date-fns/locale'; // Import Spanish locale if needed
 import type { Expense } from '@/types/expense';
 
 // Helper to safely parse date strings or use Date objects
-const safelyParseDate = (date: Date | string): Date | null => {
+const safelyParseDate = (date: Date | string | number): Date | null => {
   if (date instanceof Date && isValid(date)) {
     return date;
   }
   if (typeof date === 'string') {
-    const parsed = parseISO(date);
-    if (isValid(parsed)) {
-      return parsed;
+    // Try parsing ISO format first
+    const parsedISO = parseISO(date);
+    if (isValid(parsedISO)) {
+      return parsedISO;
     }
+    // Add other potential string format parsing if needed
+  }
+  if (typeof date === 'number') {
+      // Assume it's a timestamp if it's a number
+      const parsedTimestamp = new Date(date);
+      if (isValid(parsedTimestamp)) {
+          return parsedTimestamp;
+      }
   }
   console.warn('Invalid date encountered:', date);
   return null;
@@ -36,8 +48,9 @@ export const filterExpensesByPeriod = (
 
   switch (period) {
     case 'week':
-      start = startOfWeek(now);
-      end = endOfWeek(now);
+      // Start week on Monday (locale can influence this, adjust if needed)
+      start = startOfWeek(now, { weekStartsOn: 1 });
+      end = endOfWeek(now, { weekStartsOn: 1 });
       break;
     case 'month':
       start = startOfMonth(now);
@@ -46,44 +59,62 @@ export const filterExpensesByPeriod = (
     case 'bi-weekly':
       const monthStart = startOfMonth(now);
       const monthEnd = endOfMonth(now);
-      const midMonth = new Date(now.getFullYear(), now.getMonth(), 15);
+      const midMonth = endOfDay(new Date(now.getFullYear(), now.getMonth(), 15)); // End of the 15th
 
       if (now <= midMonth) {
         // First half of the month (1st to 15th)
         start = startOfDay(monthStart);
-        end = endOfDay(midMonth);
+        end = midMonth;
       } else {
         // Second half of the month (16th to end)
         start = startOfDay(new Date(now.getFullYear(), now.getMonth(), 16));
-        end = endOfDay(monthEnd);
+        end = endOfDay(monthEnd); // Ensure it covers the full end day
       }
       break;
     default:
       return [];
   }
 
-  // Ensure start and end cover the entire day
+  // Ensure start and end cover the entire day boundaries precisely
   start = startOfDay(start);
-  end = endOfDay(end);
+  end = endOfDay(end); // Ensure end of the period includes the whole day
 
   return expenses.filter((expense) => {
     const expenseDate = safelyParseDate(expense.timestamp);
+    // Make sure the date is valid and falls within the interval
     return expenseDate && isWithinInterval(expenseDate, { start, end });
   });
 };
 
 export const calculateTotal = (expenses: Expense[]): number => {
-  return expenses.reduce((sum, expense) => sum + expense.price, 0);
+  return expenses.reduce((sum, expense) => sum + (expense.price || 0), 0); // Handle potential undefined price
 };
 
-export const formatCurrency = (amount: number): string => {
-  // Simple formatter, consider using Intl.NumberFormat for better localization
-  return `$${amount.toFixed(2)}`;
+export const formatCurrency = (amount: number | null | undefined): string => {
+    if (amount === null || amount === undefined) {
+        return '$0.00'; // Or some other placeholder
+    }
+    // Use Intl.NumberFormat for robust localization and currency formatting
+    return new Intl.NumberFormat('es-ES', { // Example using Spanish locale
+        style: 'currency',
+        currency: 'USD', // Change currency code as needed (e.g., 'EUR', 'MXN')
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(amount);
 };
 
-export const formatDate = (date: Date | string): string => {
+export const formatDate = (date: Date | string | number): string => {
     const validDate = safelyParseDate(date);
-    if (!validDate) return 'Invalid Date';
-    // Simple formatter, consider using date-fns format or Intl.DateTimeFormat
-    return validDate.toLocaleString();
+    if (!validDate) return 'Fecha inválida';
+
+    // Use date-fns format for flexible and localized date formatting
+    // Example: 'dd/MM/yyyy HH:mm:ss'
+    // Locale can be passed for month/day names: format(validDate, 'Pp', { locale: es })
+    try {
+        return format(validDate, 'dd/MM/yyyy HH:mm', { locale: es }); // Format with Spanish locale
+    } catch (error) {
+        console.error("Error formatting date:", error, "Input date:", date, "Parsed date:", validDate);
+        // Fallback or simpler format if locale causes issues
+        return validDate.toLocaleDateString() + ' ' + validDate.toLocaleTimeString();
+    }
 }

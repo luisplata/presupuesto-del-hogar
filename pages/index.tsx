@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx'; // Import xlsx library
-// import { saveAs } from 'file-saver'; // Optional: Only if needed
+// import { saveAs } from 'file-saver'; // Optional: For direct download trigger, currently using link click
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ProductHistory } from '@/components/ProductHistory';
@@ -19,13 +19,25 @@ import Head from 'next/head'; // Import Head for page-specific metadata
 export default function Home() {
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
 
+  // Client-side state to prevent hydration mismatch for export button
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+
   const handleAddExpense = (newExpenseData: Omit<Expense, 'id' | 'timestamp'>) => {
     const newExpense: Expense = {
       ...newExpenseData,
       id: uuidv4(),
-      timestamp: new Date(),
+      timestamp: new Date(), // Store as Date object
     };
-    setExpenses(prevExpenses => [...prevExpenses, newExpense].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())); // Sort after adding
+    setExpenses(prevExpenses => [...prevExpenses, newExpense].sort((a, b) => {
+       // Safely convert timestamps to numbers for comparison
+       const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+       const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+       return timeB - timeA;
+    }));
   };
 
   const handleDeleteExpense = (idToDelete: string) => {
@@ -38,14 +50,21 @@ export default function Home() {
 
 
   const handleExportToExcel = () => {
+     // Ensure this runs only on the client
+     if (typeof window === 'undefined') return;
+
     // 1. Format data for Excel
     const dataToExport = expenses
-       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) // Ensure consistent sorting
+       .sort((a, b) => {
+         const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
+         const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
+         return timeB - timeA;
+       }) // Ensure consistent sorting
        .map(exp => ({
-      Producto: exp.product,
-      Precio: exp.price, // Keep as number for Excel calculations
-      'Fecha y Hora': formatDate(exp.timestamp), // Format date for readability
-    }));
+          Producto: exp.product,
+          Precio: exp.price, // Keep as number for Excel calculations
+          'Fecha y Hora': formatDate(exp.timestamp), // Format date for readability
+       }));
 
     // 2. Create worksheet and workbook
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
@@ -64,15 +83,14 @@ export default function Home() {
     const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     const fileName = `gastos_${formattedDate}.xlsx`;
 
-    // Use file-saver or a simple link click for download
-    // saveAs(blob, fileName); // If you installed file-saver
-    // Or use a link:
+    // Use a link click for download (more reliable than file-saver with static export)
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(link.href); // Clean up the object URL
   };
 
 
@@ -80,17 +98,20 @@ export default function Home() {
     <>
       <Head>
           <title>Expense Tracker</title>
+          <meta name="description" content="Registra y analiza tus gastos fácilmente." />
           {/* Add any other page-specific head elements here if needed */}
       </Head>
       <main className="container mx-auto p-4 min-h-screen">
          <header className="mb-8 text-center">
            <h1 className="text-3xl font-bold text-foreground">Expense Tracker</h1>
            <p className="text-muted-foreground">Registra y analiza tus gastos fácilmente.</p>
-           {/* Add Export Button */}
-           <Button onClick={handleExportToExcel} variant="outline" className="mt-4">
-              <Download className="mr-2 h-4 w-4" />
-              Exportar a Excel
-           </Button>
+           {/* Render Export Button only on the client */}
+           {isClient && (
+             <Button onClick={handleExportToExcel} variant="outline" className="mt-4">
+                <Download className="mr-2 h-4 w-4" />
+                Exportar a Excel
+             </Button>
+           )}
          </header>
 
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

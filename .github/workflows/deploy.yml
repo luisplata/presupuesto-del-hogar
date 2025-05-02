@@ -1,32 +1,42 @@
+
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches:
-      - main
+      - main # Deploy when changes are pushed to the main branch
+  workflow_dispatch: # Allow manual deployment runs
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Use v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4 # Use v4
         with:
-          node-version: "18"
+          node-version: "18" # Or your preferred Node.js version
+          cache: 'npm' # Cache npm dependencies
 
       - name: Install dependencies
-        run: npm ci
+        run: npm ci # Use ci for cleaner installs in CI
 
-      - name: Build Next.js app
-        run: npm run build
+      - name: Build and Export Next.js app
+        run: npm run build # This script now includes 'next export'
         env:
           NODE_ENV: 'production'
+          # Add any other environment variables needed for the build process
+          # Example: GOOGLE_GENAI_API_KEY: ${{ secrets.GOOGLE_GENAI_API_KEY }}
+
+      - name: Add .nojekyll file
+        run: touch out/.nojekyll # Prevents GitHub Pages from ignoring files starting with underscores
 
       - name: Deploy to GitHub Pages
         uses: JamesIves/github-pages-deploy-action@v4
         with:
-          folder: out  # ✅ correcto
-          token: ${{ secrets.ACCESS_TOKEN }}
+          folder: out # The folder the action should deploy (output of next export)
+          branch: gh-pages # Deploy to the gh-pages branch
+          token: ${{ secrets.GITHUB_TOKEN }} # Use the default GITHUB_TOKEN for authentication
+          clean: true # Automatically remove deleted files from the deploy branch
