@@ -73,18 +73,6 @@ export function ExpenseList({ expenses, title = "Historial de Gastos", caption =
     )
   }
 
-  // Group expenses by product to add a delete button per product if handler exists
-  const expensesByProduct = expenses.reduce((acc, expense) => {
-    if (!acc[expense.product]) {
-      acc[expense.product] = [];
-    }
-    acc[expense.product].push(expense);
-    return acc;
-  }, {} as Record<string, Expense[]>);
-
-  // Sort product names alphabetically if grouping, otherwise use flat sorted list
-  const sortedProducts = Object.keys(expensesByProduct).sort();
-
   // Determine if we are showing a list filtered by a single product
   const isSingleProductView = new Set(expenses.map(e => e.product)).size === 1 && expenses.length > 0;
   const singleProductName = isSingleProductView ? expenses[0].product : '';
@@ -136,7 +124,7 @@ export function ExpenseList({ expenses, title = "Historial de Gastos", caption =
             {expenses
               .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) // Sort by date descending
               .map((expense) => (
-              // Ensure no whitespace between <TableRow> and <TableCell>
+              // IMPORTANT: Ensure no whitespace between TableRow and TableCell elements
               <TableRow key={expense.id}><TableCell className="font-medium">{expense.product}</TableCell><TableCell>{formatCurrency(expense.price)}</TableCell><TableCell>{formatDate(expense.timestamp)}</TableCell><TableCell className="text-right"><AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /><span className="sr-only">Eliminar</span></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Esto eliminará permanentemente el gasto<span className="font-semibold"> "{expense.product}" </span> con precio <span className="font-semibold">{formatCurrency(expense.price)}</span>.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteClick(expense.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar Gasto</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></TableCell></TableRow>
             ))}
           </TableBody>
