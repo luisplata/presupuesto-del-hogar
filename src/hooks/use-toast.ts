@@ -1,4 +1,4 @@
-"use client"
+
 
 // Inspired by react-hot-toast library
 import * as React from "react"
@@ -59,6 +59,7 @@ interface State {
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
 
 const addToRemoveQueue = (toastId: string) => {
+  if (typeof window === 'undefined') return; // Guard against server-side execution
   if (toastTimeouts.has(toastId)) {
     return
   }

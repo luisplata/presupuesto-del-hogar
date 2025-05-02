@@ -1,5 +1,5 @@
+
 // hooks/useLocalStorage.ts
-"use client";
 
 import { useState, useCallback } from 'react';
 

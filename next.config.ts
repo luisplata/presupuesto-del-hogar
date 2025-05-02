@@ -1,9 +1,10 @@
+
 import type { NextConfig } from 'next';
 
 const repoName = 'presupuesto-del-hogar'; // 🚨 Ajusta esto si tu repo es otro (ej: "mi-app")
 
 const nextConfig: NextConfig = {
-  output: 'export',
+  // output: 'export', // Removed for Pages Router export via script
   basePath: `/${repoName}`,
   assetPrefix: `/${repoName}/`,
   trailingSlash: true,
@@ -14,6 +15,7 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   images: {
+    unoptimized: true, // Required for static export with next/image
     remotePatterns: [
       {
         protocol: 'https',

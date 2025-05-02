@@ -1,5 +1,5 @@
+
 // components/ExpenseList.tsx
-"use client";
 
 import type { Expense } from '@/types/expense';
 import React from 'react'; // Import React

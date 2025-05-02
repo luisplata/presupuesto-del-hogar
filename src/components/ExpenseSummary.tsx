@@ -1,5 +1,5 @@
+
 // components/ExpenseSummary.tsx
-"use client";
 
 import type { Expense } from '@/types/expense';
 import { useState, useEffect } from 'react'; // Import useState and useEffect
@@ -48,22 +48,27 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
       let total: number | null;
       let count: number;
       let title: string;
+      let periodName: string;
+
 
       switch (period) {
           case 'week':
               total = weeklyTotal;
               count = weeklyCount;
               title = 'Total Gastado esta Semana';
+              periodName = 'semana';
               break;
           case 'bi-weekly':
               total = biWeeklyTotal;
               count = biWeeklyCount;
               title = 'Total Gastado esta Quincena';
+              periodName = 'quincena';
               break;
           case 'month':
               total = monthlyTotal;
               count = monthlyCount;
               title = 'Total Gastado este Mes';
+              periodName = 'mes';
               break;
       }
 
@@ -81,7 +86,7 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
             <div className="mt-4 p-4 rounded-md border bg-card">
                 <h3 className="text-lg font-semibold">{title}</h3>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(total)}</p>
-                <p className="text-sm text-muted-foreground">{count} gasto(s) este {period === 'week' ? 'semana' : period === 'bi-weekly' ? 'quincena' : 'mes'}.</p>
+                <p className="text-sm text-muted-foreground">{count} gasto(s) este {periodName}.</p>
             </div>
        );
   }

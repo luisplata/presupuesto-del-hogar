@@ -1,20 +1,20 @@
-// app/page.tsx
-"use client";
+
+// pages/index.tsx
 
 import { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx'; // Import xlsx library
-import { saveAs } from 'file-saver'; // Optional: if xlsx doesn't handle download automatically in all browsers
+// import { saveAs } from 'file-saver'; // Optional: Only if needed
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ProductHistory } from '@/components/ProductHistory';
-import { Toaster } from '@/components/ui/toaster';
+// Toaster is now in _app.tsx
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '@/components/ui/button'; // Import Button
 import { Download } from 'lucide-react'; // Import Download icon
 import { formatDate, formatCurrency } from '@/lib/dateUtils'; // Import formatters
-
+import Head from 'next/head'; // Import Head for page-specific metadata
 
 export default function Home() {
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
@@ -32,9 +32,10 @@ export default function Home() {
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.id !== idToDelete));
   };
 
-  const handleDeleteProduct = (productNameToDelete: string) => {
-    setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product !== productNameToDelete));
-  };
+   const handleDeleteProduct = (productNameToDelete: string) => {
+     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product !== productNameToDelete));
+   };
+
 
   const handleExportToExcel = () => {
     // 1. Format data for Excel
@@ -76,34 +77,39 @@ export default function Home() {
 
 
   return (
-    <main className="container mx-auto p-4 min-h-screen">
-       <header className="mb-8 text-center">
-         <h1 className="text-3xl font-bold text-foreground">Expense Tracker</h1>
-         <p className="text-muted-foreground">Registra y analiza tus gastos fácilmente.</p>
-         {/* Add Export Button */}
-         <Button onClick={handleExportToExcel} variant="outline" className="mt-4">
-            <Download className="mr-2 h-4 w-4" />
-            Exportar a Excel
-         </Button>
-       </header>
+    <>
+      <Head>
+          <title>Expense Tracker</title>
+          {/* Add any other page-specific head elements here if needed */}
+      </Head>
+      <main className="container mx-auto p-4 min-h-screen">
+         <header className="mb-8 text-center">
+           <h1 className="text-3xl font-bold text-foreground">Expense Tracker</h1>
+           <p className="text-muted-foreground">Registra y analiza tus gastos fácilmente.</p>
+           {/* Add Export Button */}
+           <Button onClick={handleExportToExcel} variant="outline" className="mt-4">
+              <Download className="mr-2 h-4 w-4" />
+              Exportar a Excel
+           </Button>
+         </header>
 
-       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
-           <ExpenseForm onAddExpense={handleAddExpense} />
-        </div>
+         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-1">
+             <ExpenseForm onAddExpense={handleAddExpense} />
+          </div>
 
-        <div className="md:col-span-2 space-y-6">
-           <ExpenseSummary expenses={expenses} />
-           <ProductHistory
-             expenses={expenses}
-             onDeleteExpense={handleDeleteExpense}
-             onDeleteProduct={handleDeleteProduct}
-            />
-        </div>
-       </div>
+          <div className="md:col-span-2 space-y-6">
+             <ExpenseSummary expenses={expenses} />
+             <ProductHistory
+               expenses={expenses}
+               onDeleteExpense={handleDeleteExpense}
+               onDeleteProduct={handleDeleteProduct}
+              />
+          </div>
+         </div>
 
-      <Toaster />
-    </main>
+        {/* Toaster is rendered in _app.tsx */}
+      </main>
+    </>
   );
 }
-

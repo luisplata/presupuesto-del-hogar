@@ -1,5 +1,5 @@
+
 // components/ProductHistory.tsx
-"use client";
 
 import type { Expense } from '@/types/expense';
 import React, { useState, useMemo, useCallback } from 'react';

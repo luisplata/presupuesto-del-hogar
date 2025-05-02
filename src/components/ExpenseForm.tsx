@@ -1,5 +1,5 @@
+
 // components/ExpenseForm.tsx
-"use client";
 
 import * as z from "zod"; // Import zod
 import { zodResolver } from "@hookform/resolvers/zod";
