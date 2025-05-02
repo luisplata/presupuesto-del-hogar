@@ -2,7 +2,7 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'export',
-  basePath: '/presupuesto-del-hogar', // Add this line
+  assetPrefix: '/presupuesto-del-hogar/_next/', // Modify this line
   typescript: {
     ignoreBuildErrors: true,
   },
