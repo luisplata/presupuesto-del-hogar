@@ -62,7 +62,8 @@ This application is configured to be installable as a PWA on compatible desktop 
 
 **Installation:**
 
-*   **Desktop (Chrome, Edge):** Look for an install icon (often a computer screen with a down arrow) in the address bar when visiting the deployed site. Click it and follow the prompts.
+*   **Prerequisites:** You must be accessing the deployed site via **HTTPS** (GitHub Pages provides this). The install prompt generally won't appear on `http://localhost`.
+*   **Desktop (Chrome, Edge):** Look for an install icon (often a computer screen with a down arrow, or sometimes within the browser menu ⋮) in the address bar when visiting the deployed site. Click it and follow the prompts.
 *   **Mobile (Android - Chrome):** Visit the site, and you should see an "Add to Home screen" banner or find the option in the browser menu (⋮).
 *   **Mobile (iOS - Safari):** Visit the site, tap the "Share" icon, and then select "Add to Home Screen".
 
@@ -71,8 +72,9 @@ This application is configured to be installable as a PWA on compatible desktop 
 *   For the PWA to install correctly and display appropriate icons, you **must** create and place the following icon files in the `public/icons/` directory:
     *   `icon-192x192.png` (Required by manifest)
     *   `icon-512x512.png` (Required by manifest)
-    *   `apple-touch-icon.png` (Recommended for iOS, typically 180x180 or larger)
-*   You might also want to add a `favicon.ico` file to the `public/` directory for browser tabs.
+    *   `apple-touch-icon.png` (Required for iOS 'Add to Home Screen', typically 180x180 or larger)
+*   **Placeholder icons have been added to `public/icons/` to enable the install prompt, but they are just text files. You MUST replace these with actual `.png` image files for the PWA to display correctly after installation.**
+*   You might also want to add a `favicon.ico` file to the `public/` directory for browser tabs (optional for PWA installability).
 
 *   **Offline Support:** Full offline capabilities via a service worker are not implemented by default due to potential complexities with `next export`. For basic installability, a service worker isn't strictly required. Libraries like `next-pwa` can add offline support but might need careful configuration with static exports.
 
@@ -84,8 +86,10 @@ This application is configured to be installable as a PWA on compatible desktop 
     *   The `basePath` is *not* applied in development mode due to the conditional logic in `next.config.js`, so it shouldn't be the cause of 404s at the root during `npm run dev`.
     *   Persistent issues might require restarting the development server (`Ctrl+C` and `npm run dev` again) or checking the IDE/environment configuration. Ensure you are accessing `http://localhost:3000` and not `http://localhost:3000/presupuesto-del-hogar/` during development.
 *   **PWA Install Prompt Not Appearing:**
-    *   Ensure you are accessing the site via HTTPS (GitHub Pages provides this).
-    *   Verify that the `manifest.json` is accessible at the correct path (e.g., `https://<user>.github.io/presupuesto-del-hogar/manifest.json`).
-    *   Check the browser's developer console (Application > Manifest tab) for errors.
-    *   Make sure you have created the necessary icon files (especially `icon-192x192.png` and `icon-512x512.png`) in `public/icons/`. Some browsers won't prompt if icons are missing.
-*   **PWA Icons Not Showing After Install:** Double-check that the icon files exist at the paths specified in `public/manifest.json` and `pages/_document.tsx`. Clear the browser cache or uninstall/reinstall the PWA.
+    *   **Access via HTTPS:** Ensure you are visiting the deployed site (e.g., on GitHub Pages) which uses HTTPS. The prompt usually doesn't show on local `http`.
+    *   **Manifest Check:** Verify that the `manifest.json` is accessible at the correct path (e.g., `https://<user>.github.io/presupuesto-del-hogar/manifest.json`). Check the browser's developer console (Application > Manifest tab or similar) for errors.
+    *   **Icon Files:** This is a common issue. **Confirm that you have created *actual image files* (`icon-192x192.png`, `icon-512x512.png`, `apple-touch-icon.png`) and placed them in the `public/icons/` directory.** Missing icons often prevent the install prompt. Replace the placeholder text files.
+    *   **Browser Cache/State:** Try clearing your browser's cache and site data for the deployed URL, or test in an incognito/private window. Check your browser's app settings (e.g., `edge://apps` in Edge) to see if the site is already listed or blocked.
+    *   **Wait/Reload:** Sometimes it takes a moment or a reload for the browser to recognize the PWA criteria.
+*   **PWA Icons Not Showing After Install:** Double-check that the *actual image files* exist at the paths specified in `public/manifest.json` and `pages/_document.tsx`. Ensure they are valid PNGs. Clear the browser cache or uninstall/reinstall the PWA.
+
