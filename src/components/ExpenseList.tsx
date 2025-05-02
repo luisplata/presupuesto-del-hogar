@@ -124,7 +124,7 @@ export function ExpenseList({ expenses, title = "Historial de Gastos", caption =
             {expenses
               .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()) // Sort by date descending
               .map((expense) => (
-              // IMPORTANT: Ensure no whitespace between TableRow and TableCell elements
+              // IMPORTANT: Ensure no whitespace between TableRow and TableCell elements, AND no whitespace around the <TableRow> tag itself within the map.
               <TableRow key={expense.id}><TableCell className="font-medium">{expense.product}</TableCell><TableCell>{formatCurrency(expense.price)}</TableCell><TableCell>{formatDate(expense.timestamp)}</TableCell><TableCell className="text-right"><AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /><span className="sr-only">Eliminar</span></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Esto eliminará permanentemente el gasto<span className="font-semibold"> "{expense.product}" </span> con precio <span className="font-semibold">{formatCurrency(expense.price)}</span>.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteClick(expense.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar Gasto</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></TableCell></TableRow>
             ))}
           </TableBody>
