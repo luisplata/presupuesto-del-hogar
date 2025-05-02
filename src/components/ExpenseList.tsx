@@ -162,7 +162,6 @@ export function ExpenseList({ expenses, title = "Historial de Gastos", caption =
                         </AlertDialogFooter>
                     </AlertDialogContent>
                     </AlertDialog>
-
                 </TableCell></TableRow>
             ))}
           </TableBody>
