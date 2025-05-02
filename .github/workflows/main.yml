@@ -25,20 +25,22 @@ jobs:
           echo "REACT_APP_MEDIA_BASE_URL=${{ secrets.REACT_APP_MEDIA_BASE_URL }}" >> .env
 
       - name: ⚙️ Construir la aplicación
-        run: CI=false npm run build
+        run: |
+          CI=false npm run build
+          npx next export
         
-      - name: 🔍 Verificar si la carpeta build existe
-        run: ls -la
+      - name: 🔍 Verificar si la carpeta out existe
+        run: ls -la out
 
       - name: 🗜️ Comprimir el build
         run: |
-          cd build
+          cd out
           zip -r ../build.zip .
 
       - name: Validate build.zip
         run: |
-          echo "Listing contents of build directory:"
-          ls -la build
+          echo "Listing contents of out directory:"
+          ls -la out
           echo "Checking build.zip:"
           ls -la build.zip || echo "build.zip not found!"
 
