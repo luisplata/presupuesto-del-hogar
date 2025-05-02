@@ -25,12 +25,9 @@ jobs:
           echo "REACT_APP_MEDIA_BASE_URL=${{ secrets.REACT_APP_MEDIA_BASE_URL }}" >> .env
           echo "REPO_NAME=" >> .env  # Aquí no definimos ningún valor para REPO_NAME, lo dejamos vacío
 
-      - name: ⚙️ Construir la aplicación
+      - name: ⚙️ Construir la aplicación (Next.js export automático)
         run: npm run build
 
-      - name: 📦 Exportar la aplicación estática
-        run: npm run export
-        
       - name: 🔍 Verificar si la carpeta out existe
         run: ls -la out
 
