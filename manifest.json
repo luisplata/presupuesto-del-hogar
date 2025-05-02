@@ -2,22 +2,22 @@
   "name": "Expense Tracker",
   "short_name": "ExpenseTracker",
   "description": "Track your expenses easily.",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#f0f0f0",
-  "theme_color": "#008080",
+  "start_url": ".", // Use relative path for start_url with basePath
+  "display": "standalone", // Ensures it opens like a native app
+  "background_color": "#f0f0f0", // Match light theme background
+  "theme_color": "#008080", // Match primary theme color
   "icons": [
     {
       "src": "icons/icon-192x192.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any maskable" // 'maskable' helps with adaptive icons
     },
     {
       "src": "icons/icon-512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-       "purpose": "any maskable"
+       "purpose": "any maskable" // 'maskable' helps with adaptive icons
     }
   ]
 }
