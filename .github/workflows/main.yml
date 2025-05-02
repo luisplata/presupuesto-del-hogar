@@ -1,4 +1,4 @@
-name: Deploy React App in server
+name: Deploy Next.js App in server
 
 on:
   workflow_dispatch: {}
@@ -25,10 +25,8 @@ jobs:
           echo "REACT_APP_MEDIA_BASE_URL=${{ secrets.REACT_APP_MEDIA_BASE_URL }}" >> .env
 
       - name: ⚙️ Construir la aplicación
-        run: |
-          CI=false npm run build
-          npx next export
-        
+        run: CI=false npm run build
+
       - name: 🔍 Verificar si la carpeta out existe
         run: ls -la out
 
@@ -89,7 +87,6 @@ jobs:
             APP_DIR="${HOME}/${{ secrets.APP_DIR }}"
             ARTIFACT_URL="${{ needs.export-and-deploy.outputs.artifact_url }}"
             TEMP_ZIP="$APP_DIR/Export.zip"
-
             # Limpiar el directorio si existe
             if [ -d "$APP_DIR" ]; then
               echo "Cleaning APP_DIR..."
@@ -98,36 +95,29 @@ jobs:
               echo "Creating APP_DIR..."
               mkdir -p "$APP_DIR"
             fi
-
             # Descargar el archivo ZIP
             echo "Downloading artifact..."
             curl -L -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
               "$ARTIFACT_URL" -o "$TEMP_ZIP"
-
             # Verificar el contenido del ZIP descargado
             echo "Checking ZIP contents..."
             unzip -l "$TEMP_ZIP"
-
             # Comprobar si la descarga fue exitosa
             if [ $? -ne 0 ]; then
               echo "Failed to download artifact."
               exit 1
             fi
-
             # Descomprimir el archivo en APP_DIR
             echo "Extracting ZIP..."
             unzip -o "$TEMP_ZIP" -d "$APP_DIR"
-
             # Eliminar el ZIP para evitar conflictos futuros
             echo "Deleting ZIP..."
             rm -f "$TEMP_ZIP"
-
             # Descomprimir el archivo en APP_DIR
             echo "Extracting ZIP..."
             unzip -o "$APP_DIR/build.zip" -d "$APP_DIR"
-
             # Eliminar el ZIP para evitar conflictos futuros
             echo "Deleting ZIP..."
             rm -f "$APP_DIR/build.zip"
-            
+
             echo "Deployment finished!"
