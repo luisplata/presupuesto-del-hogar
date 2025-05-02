@@ -38,5 +38,5 @@ jobs:
         with:
           folder: out # The folder the action should deploy (output of the export)
           branch: gh-pages # Deploy to the gh-pages branch
-          token: ${{ secrets.GITHUB_TOKEN }} # Use the default GITHUB_TOKEN for authentication
+          token: ${{ secrets.ACCESS_TOKEN }} # Use the default GITHUB_TOKEN for authentication
           clean: true # Automatically remove deleted files from the deploy branch
