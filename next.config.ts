@@ -1,7 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  output: 'export', // This is the key line!
+  output: 'export',
+  basePath: '/presupuesto-del-hogar', // Add this line
   typescript: {
     ignoreBuildErrors: true,
   },
