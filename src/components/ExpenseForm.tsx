@@ -1,7 +1,6 @@
-
 // components/ExpenseForm.tsx
 
-import * as z from "zod"; // Import zod
+import * as z from "zod"; // Ensure zod is imported
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -40,7 +39,7 @@ export function ExpenseForm({ onAddExpense }: ExpenseFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       product: "",
-      price: 0,
+      price: 0, // Initialize with 0 or an appropriate number default
     },
   });
 
@@ -88,12 +87,13 @@ export function ExpenseForm({ onAddExpense }: ExpenseFormProps) {
           name="price"
           render={({ field }) => (
             <FormItem>
-              {/* Updated label to specify COP */}
+              {/* Label clearly indicates COP */}
               <FormLabel>Precio (COP)</FormLabel>
               <FormControl>
-                {/* Keep input type="number" for direct number entry */}
-                {/* Updated placeholder */}
-                <Input type="number" placeholder="Ej: 5500" {...field} />
+                {/* Input type="number" expects raw number input */}
+                {/* Placeholder shows example of raw number input */}
+                <Input type="number" placeholder="Ej: 5500" {...field} step="any" // Allow any number step if needed, but typically whole numbers for COP
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
