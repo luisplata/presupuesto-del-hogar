@@ -3,7 +3,7 @@ import type { AppProps } from 'next/app';
 import { Geist, Geist_Mono } from 'next/font/google';
 import '@/app/globals.css'; // Keep the path as is, assuming globals.css is in src/app
 import { Toaster } from "@/components/ui/toaster";
-import { useRouter } from 'next/router'; // Import useRouter
+// Removed useRouter import as it's not needed here
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -16,8 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 function MyApp({ Component, pageProps }: AppProps) {
-   const router = useRouter(); // Get router object
-   const basePath = router.basePath; // Get basePath from router
+   // Removed useRouter hook and basePath variable
 
   return (
     <div className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
