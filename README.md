@@ -56,11 +56,25 @@ This project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`)
 
 Your deployed site will be available at `https://<your-username>.github.io/presupuesto-del-hogar/`. Make sure the `homepage` field in `package.json` and the `basePath`/`assetPrefix` in `next.config.js` match this URL structure. Accessing `https://<your-username>.github.io/` directly will likely result in a 404.
 
-## PWA Notes
+## PWA (Progressive Web App) Installation
 
-*   The application includes a `manifest.json` and necessary meta tags to be installable as a PWA.
-*   You will need to provide actual icon files (e.g., `public/icons/icon-192x192.png`, `public/icons/icon-512x512.png`) for the PWA to display correctly when installed. The manifest currently references these paths.
-*   Full offline capabilities via a service worker are not implemented by default due to the complexities with `next export`. Libraries like `next-pwa` might be needed for robust offline support, but they have potential compatibility issues with `next export`.
+This application is configured to be installable as a PWA on compatible desktop and mobile devices.
+
+**Installation:**
+
+*   **Desktop (Chrome, Edge):** Look for an install icon (often a computer screen with a down arrow) in the address bar when visiting the deployed site. Click it and follow the prompts.
+*   **Mobile (Android - Chrome):** Visit the site, and you should see an "Add to Home screen" banner or find the option in the browser menu (⋮).
+*   **Mobile (iOS - Safari):** Visit the site, tap the "Share" icon, and then select "Add to Home Screen".
+
+**Important Icon Requirements:**
+
+*   For the PWA to install correctly and display appropriate icons, you **must** create and place the following icon files in the `public/icons/` directory:
+    *   `icon-192x192.png` (Required by manifest)
+    *   `icon-512x512.png` (Required by manifest)
+    *   `apple-touch-icon.png` (Recommended for iOS, typically 180x180 or larger)
+*   You might also want to add a `favicon.ico` file to the `public/` directory for browser tabs.
+
+*   **Offline Support:** Full offline capabilities via a service worker are not implemented by default due to potential complexities with `next export`. For basic installability, a service worker isn't strictly required. Libraries like `next-pwa` can add offline support but might need careful configuration with static exports.
 
 ## Troubleshooting
 
@@ -69,4 +83,9 @@ Your deployed site will be available at `https://<your-username>.github.io/presu
     *   If the application generally loads and functions at `http://localhost:3000`, these errors can sometimes be ignored.
     *   The `basePath` is *not* applied in development mode due to the conditional logic in `next.config.js`, so it shouldn't be the cause of 404s at the root during `npm run dev`.
     *   Persistent issues might require restarting the development server (`Ctrl+C` and `npm run dev` again) or checking the IDE/environment configuration. Ensure you are accessing `http://localhost:3000` and not `http://localhost:3000/presupuesto-del-hogar/` during development.
-*   **PWA Icons Not Showing:** Ensure you have placed correctly named icon files in the `public/icons/` directory as referenced in `public/manifest.json`.
+*   **PWA Install Prompt Not Appearing:**
+    *   Ensure you are accessing the site via HTTPS (GitHub Pages provides this).
+    *   Verify that the `manifest.json` is accessible at the correct path (e.g., `https://<user>.github.io/presupuesto-del-hogar/manifest.json`).
+    *   Check the browser's developer console (Application > Manifest tab) for errors.
+    *   Make sure you have created the necessary icon files (especially `icon-192x192.png` and `icon-512x512.png`) in `public/icons/`. Some browsers won't prompt if icons are missing.
+*   **PWA Icons Not Showing After Install:** Double-check that the icon files exist at the paths specified in `public/manifest.json` and `pages/_document.tsx`. Clear the browser cache or uninstall/reinstall the PWA.
