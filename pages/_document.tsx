@@ -32,6 +32,11 @@ export default function Document(props: DocumentProps) {
         {/* Example explicit link (usually not needed if /public/favicon.ico exists): */}
         {/* <link rel="icon" href={`${basePath}/favicon.ico`} /> */}
 
+        {/* Placeholder for PWA icons - Assume these exist in public/icons */}
+        {/* <link rel="apple-touch-icon" href={`${basePath}/icons/icon-192x192.png`} /> */}
+        {/* <link rel="icon" type="image/png" sizes="192x192" href={`${basePath}/icons/icon-192x192.png`} /> */}
+        {/* <link rel="icon" type="image/png" sizes="512x512" href={`${basePath}/icons/icon-512x512.png`} /> */}
+
       </Head>
       <body>
         <Main />

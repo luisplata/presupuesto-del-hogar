@@ -1,7 +1,7 @@
 
 # Expense Tracker (using Next.js Pages Router)
 
-This is a Next.js application for tracking expenses, built using the Pages Router for compatibility with `next export` and static hosting like GitHub Pages.
+This is a Next.js application for tracking expenses, built using the Pages Router for compatibility with `next export` and static hosting like GitHub Pages. It includes Progressive Web App (PWA) features, making it installable on supported devices.
 
 To get started, take a look at `pages/index.tsx`.
 
@@ -56,6 +56,12 @@ This project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`)
 
 Your deployed site will be available at `https://<your-username>.github.io/presupuesto-del-hogar/`. Make sure the `homepage` field in `package.json` and the `basePath`/`assetPrefix` in `next.config.js` match this URL structure. Accessing `https://<your-username>.github.io/` directly will likely result in a 404.
 
+## PWA Notes
+
+*   The application includes a `manifest.json` and necessary meta tags to be installable as a PWA.
+*   You will need to provide actual icon files (e.g., `public/icons/icon-192x192.png`, `public/icons/icon-512x512.png`) for the PWA to display correctly when installed. The manifest currently references these paths.
+*   Full offline capabilities via a service worker are not implemented by default due to the complexities with `next export`. Libraries like `next-pwa` might be needed for robust offline support, but they have potential compatibility issues with `next export`.
+
 ## Troubleshooting
 
 *   **404 Error at Root (`/`) after Build/Deploy:** This is expected behavior when a `basePath` is configured. Access the site using the full path including the `basePath` (e.g., `/presupuesto-del-hogar/`).
@@ -63,3 +69,4 @@ Your deployed site will be available at `https://<your-username>.github.io/presu
     *   If the application generally loads and functions at `http://localhost:3000`, these errors can sometimes be ignored.
     *   The `basePath` is *not* applied in development mode due to the conditional logic in `next.config.js`, so it shouldn't be the cause of 404s at the root during `npm run dev`.
     *   Persistent issues might require restarting the development server (`Ctrl+C` and `npm run dev` again) or checking the IDE/environment configuration. Ensure you are accessing `http://localhost:3000` and not `http://localhost:3000/presupuesto-del-hogar/` during development.
+*   **PWA Icons Not Showing:** Ensure you have placed correctly named icon files in the `public/icons/` directory as referenced in `public/manifest.json`.
