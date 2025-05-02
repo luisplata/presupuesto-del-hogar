@@ -25,7 +25,7 @@ To get started, take a look at `pages/index.tsx`.
 npm run build
 ```
 
-This command will build the application and export it as static HTML/CSS/JS files into the `out` directory. The `basePath` and `assetPrefix` configuration in `next.config.js` will be applied during this build process, setting the base path to `/presupuesto-del-hogar/`.
+This command will build the application and export it as static HTML/CSS/JS files into the `out` directory. The `output: 'export'` setting in `next.config.js` handles the static export process. The `basePath` and `assetPrefix` configurations in `next.config.js` will also be applied during this build, setting the base path to `/presupuesto-del-hogar/`.
 
 ### Testing the Static Build Locally
 
@@ -50,7 +50,7 @@ This project includes a GitHub Actions workflow (`.github/workflows/deploy.yml`)
 
 *   On push to `main`, the workflow runs.
 *   It checks out the code, installs dependencies, and runs `npm run build`.
-*   The `build` script executes `next build && next export`, generating the static site in the `out` folder with the correct `basePath`.
+*   The `build` script executes `next build`, which automatically triggers the static export defined by `output: 'export'` in `next.config.js`, generating the static site in the `out` folder with the correct `basePath`.
 *   The workflow then pushes the contents of the `out` folder to the `gh-pages` branch.
 *   GitHub Pages serves the site from the `gh-pages` branch.
 
@@ -63,4 +63,3 @@ Your deployed site will be available at `https://<your-username>.github.io/presu
     *   If the application generally loads and functions at `http://localhost:3000`, these errors can sometimes be ignored.
     *   The `basePath` is *not* applied in development mode due to the conditional logic in `next.config.js`, so it shouldn't be the cause of 404s at the root during `npm run dev`.
     *   Persistent issues might require restarting the development server (`Ctrl+C` and `npm run dev` again) or checking the IDE/environment configuration. Ensure you are accessing `http://localhost:3000` and not `http://localhost:3000/presupuesto-del-hogar/` during development.
-```
