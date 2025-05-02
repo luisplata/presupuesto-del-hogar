@@ -17,12 +17,13 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from 'react';
 import type { Expense } from '@/types/expense';
+import { formatCurrency } from "@/lib/dateUtils"; // Import formatCurrency
 
 const formSchema = z.object({
   product: z.string().min(1, {
     message: "El nombre del producto no puede estar vacío.",
   }),
-  price: z.coerce.number().positive({
+  price: z.coerce.number().positive({ // Keep validation as positive number
     message: "El precio debe ser un número positivo.",
   }),
 });
@@ -51,7 +52,7 @@ export function ExpenseForm({ onAddExpense }: ExpenseFormProps) {
       onAddExpense({ product: values.product, price: values.price });
       toast({
         title: "Gasto agregado",
-        description: `Producto: ${values.product}, Precio: ${values.price}`,
+        description: `Producto: ${values.product}, Precio: ${formatCurrency(values.price)}`, // Format price in toast
       });
       form.reset(); // Reset form after successful submission
     } catch (error) {
@@ -87,9 +88,12 @@ export function ExpenseForm({ onAddExpense }: ExpenseFormProps) {
           name="price"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Precio</FormLabel>
+              {/* Updated label to specify COP */}
+              <FormLabel>Precio (COP)</FormLabel>
               <FormControl>
-                <Input type="number" placeholder="Ej: 5.50" step="0.01" {...field} />
+                {/* Keep input type="number" for direct number entry */}
+                {/* Updated placeholder */}
+                <Input type="number" placeholder="Ej: 5500" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>

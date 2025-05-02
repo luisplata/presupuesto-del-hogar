@@ -92,14 +92,14 @@ export const calculateTotal = (expenses: Expense[]): number => {
 
 export const formatCurrency = (amount: number | null | undefined): string => {
     if (amount === null || amount === undefined) {
-        return '$0.00'; // Or some other placeholder
+        amount = 0; // Default to 0 if null or undefined
     }
     // Use Intl.NumberFormat for robust localization and currency formatting
-    return new Intl.NumberFormat('es-ES', { // Example using Spanish locale
+    return new Intl.NumberFormat('es-CO', { // Use Spanish - Colombia locale
         style: 'currency',
-        currency: 'USD', // Change currency code as needed (e.g., 'EUR', 'MXN')
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        currency: 'COP', // Set currency code to COP
+        minimumFractionDigits: 0, // COP typically doesn't use cents
+        maximumFractionDigits: 0,
     }).format(amount);
 };
 

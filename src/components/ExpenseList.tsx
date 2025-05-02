@@ -112,12 +112,8 @@ export function ExpenseList({ expenses, title = "Historial de Gastos", caption =
         <Table>
           <TableCaption>{caption}</TableCaption>
           <TableHeader>
-            <TableRow>
-              <TableHead>Producto</TableHead>
-              <TableHead>Precio</TableHead>
-              <TableHead>Fecha y Hora</TableHead>
-              <TableHead className="text-right">Acciones</TableHead> {/* Actions header */}
-            </TableRow>
+            {/* IMPORTANT: Ensure no whitespace between TableRow and TableCell elements */}
+            <TableRow><TableHead>Producto</TableHead><TableHead>Precio</TableHead><TableHead>Fecha y Hora</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow>
           </TableHeader>
           <TableBody>
             {expenses
