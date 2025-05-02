@@ -90,18 +90,32 @@ export const calculateTotal = (expenses: Expense[]): number => {
   return expenses.reduce((sum, expense) => sum + (expense.price || 0), 0); // Handle potential undefined price
 };
 
+const COP_FORMATTER = new Intl.NumberFormat('es-CO', { // Use Spanish - Colombia locale
+    style: 'currency',
+    currency: 'COP', // Set currency code to COP
+    minimumFractionDigits: 0, // COP typically doesn't use cents
+    maximumFractionDigits: 0,
+});
+
 export const formatCurrency = (amount: number | null | undefined): string => {
-    if (amount === null || amount === undefined) {
-        amount = 0; // Default to 0 if null or undefined
+    if (amount === null || amount === undefined || isNaN(amount)) {
+        amount = 0; // Default to 0 if null, undefined, or NaN
     }
-    // Use Intl.NumberFormat for robust localization and currency formatting
-    return new Intl.NumberFormat('es-CO', { // Use Spanish - Colombia locale
-        style: 'currency',
-        currency: 'COP', // Set currency code to COP
-        minimumFractionDigits: 0, // COP typically doesn't use cents
-        maximumFractionDigits: 0,
-    }).format(amount);
+    return COP_FORMATTER.format(amount);
 };
+
+export const parseCurrency = (formattedValue: string | number | null | undefined): number => {
+    if (formattedValue === null || formattedValue === undefined) {
+        return 0;
+    }
+    // Convert to string if it's a number
+    const stringValue = String(formattedValue);
+    // Remove non-digit characters (currency symbols, dots, commas)
+    const numericString = stringValue.replace(/[^\d]/g, '');
+    const number = parseInt(numericString, 10);
+    return isNaN(number) ? 0 : number; // Return 0 if parsing fails or result is NaN
+};
+
 
 export const formatDate = (date: Date | string | number): string => {
     const validDate = safelyParseDate(date);
