@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, ChangeEvent, useMemo } from 'react'; // Import useMemo
 import type { Expense } from '@/types/expense';
 import { formatCurrency, parseCurrency } from "@/lib/dateUtils";
-import { useLocale } from '@/hooks/useLocale'; // Import useLocale
+
 
 interface ExpenseFormProps {
   onAddExpense: (expense: Omit<Expense, 'id' | 'timestamp'>) => void;
@@ -26,26 +26,25 @@ interface ExpenseFormProps {
 }
 
 // Define Zod schema using a function to access translations
-const createFormSchema = (t: (key: string) => string) => z.object({
+const createFormSchema = () => z.object({
   product: z.string().min(1, {
-    message: t('form.validation.productRequired'), // Use translated message
+    message: 'El nombre del producto no puede estar vacío.', // Hardcoded Spanish
   }),
   price: z.coerce.number().positive({ // Validation remains as positive number
-    message: t('form.validation.pricePositive'), // Use translated message
+    message: 'El precio debe ser un número positivo.', // Hardcoded Spanish
   }),
   category: z.string().optional(), // Category is optional in the schema, default handled in logic
 });
 
 
 export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: ExpenseFormProps) {
-  const { t } = useLocale(); // Use the hook
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Local state to hold the formatted price string for the input display
   const [formattedPrice, setFormattedPrice] = useState("");
 
   // Dynamically create the schema with translations
-  const formSchema = useMemo(() => createFormSchema(t), [t]);
+  const formSchema = useMemo(() => createFormSchema(), []);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -102,21 +101,16 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
       });
 
       toast({
-        title: t('form.toast.expenseAddedTitle'), // Translated title
-        description: t('form.toast.expenseAddedDescription', { // Translated description with interpolation
-            product: values.product,
-            price: formatCurrency(values.price),
-            // Translate category for the toast message
-            category: categoryToSubmit === defaultCategoryKey ? t(defaultCategoryKey) : categoryToSubmit
-        }),
+        title: 'Gasto agregado', // Hardcoded Spanish title
+        description: `Producto: ${values.product}, Precio: ${formatCurrency(values.price)}, Categoría: ${categoryToSubmit}`, // Hardcoded Spanish description
       });
       form.reset({ product: "", price: 0, category: "" }); // Reset form with category empty
       setFormattedPrice(formatCurrency(0)); // Reset local formatted price state
     } catch (error) {
-      console.error("Failed to add expense:", error);
+      console.error("Error al agregar gasto:", error);
       toast({
-        title: t('form.toast.errorTitle'), // Translated error title
-        description: t('form.toast.errorDescription'), // Translated error description
+        title: 'Error', // Hardcoded Spanish error title
+        description: 'No se pudo agregar el gasto.', // Hardcoded Spanish error description
         variant: "destructive",
       });
     } finally {
@@ -132,9 +126,9 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
           name="product"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('form.productLabel')}</FormLabel>
+              <FormLabel>Producto</FormLabel>
               <FormControl>
-                <Input placeholder={t('form.productPlaceholder')} {...field} />
+                <Input placeholder="Ej: Café" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -145,7 +139,7 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
           name="price"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('form.priceLabel')}</FormLabel>
+              <FormLabel>Precio (COP)</FormLabel>
               <FormControl>
                 <Input
                   type="text" // Use text to allow formatting characters
@@ -166,11 +160,11 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
           name="category"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>{t('form.categoryLabel')}</FormLabel>
+              <FormLabel>Categoría (Opcional)</FormLabel>
               <FormControl>
                 <>
                  <Input
-                    placeholder={t('form.categoryPlaceholder')}
+                    placeholder="Ej: Comida"
                     {...field}
                     list="category-suggestions"
                     autoComplete="off"
@@ -188,7 +182,7 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
           )}
         />
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? t('form.submittingButton') : t('form.submitButton')}
+          {isSubmitting ? 'Agregando...' : 'Agregar Gasto'}
         </Button>
       </form>
     </Form>

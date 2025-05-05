@@ -13,7 +13,7 @@ import {
 } from 'date-fns';
 // Correct import paths for locales
 import { es } from 'date-fns/locale/es';
-import { enUS } from 'date-fns/locale/en-US';
+import { enUS } from 'date-fns/locale/en-US'; // Keep enUS for fallback logic if needed elsewhere
 import type { Expense } from '@/types/expense';
 
 // Helper to safely parse date strings or use Date objects
@@ -36,7 +36,7 @@ export const safelyParseDate = (date: Date | string | number): Date | null => {
           return parsedTimestamp;
       }
   }
-  console.warn('Invalid date encountered:', date);
+  console.warn('Fecha inválida encontrada:', date); // Hardcoded Spanish warning
   return null;
 };
 
@@ -119,20 +119,20 @@ export const parseCurrency = (formattedValue: string | number | null | undefined
     return isNaN(number) ? 0 : number; // Return 0 if parsing fails or result is NaN
 };
 
-// Updated formatDate to accept locale
-export const formatDate = (date: Date | string | number, locale: string = 'en'): string => {
+// Updated formatDate to default to Spanish locale
+export const formatDate = (date: Date | string | number): string => {
     const validDate = safelyParseDate(date);
-    if (!validDate) return 'Invalid date'; // Consider translating this
+    if (!validDate) return 'Fecha inválida'; // Hardcoded Spanish
 
-    // Determine the date-fns locale object based on the locale string
-    const dateFnsLocale = locale === 'es' ? es : enUS; // Default to enUS if not 'es'
+    // Use Spanish locale by default
+    const dateFnsLocale = es;
 
     try {
-        // Use date-fns format with the determined locale
+        // Use date-fns format with the Spanish locale
         return format(validDate, 'dd/MM/yyyy HH:mm', { locale: dateFnsLocale });
     } catch (error) {
-        console.error("Error formatting date:", error, "Input date:", date, "Parsed date:", validDate);
+        console.error("Error al formatear fecha:", error, "Fecha de entrada:", date, "Fecha parseada:", validDate);
         // Fallback or simpler format if locale causes issues
-        return validDate.toLocaleDateString() + ' ' + validDate.toLocaleTimeString();
+        return validDate.toLocaleDateString('es-ES') + ' ' + validDate.toLocaleTimeString('es-ES'); // Use Spanish locale for fallback
     }
 }

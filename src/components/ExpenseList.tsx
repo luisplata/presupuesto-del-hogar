@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge'; // Import Badge
-import { useLocale } from '@/hooks/useLocale'; // Import useLocale
 
 
 interface ExpenseListProps {
@@ -39,9 +38,9 @@ interface ExpenseListProps {
   onDeleteExpense: (id: string) => void;
   // Generic group deletion props
   groupName?: string;         // Identifier (key or name) of the current group
-  groupDisplayName?: string;  // Translated/display name of the group for UI
+  groupDisplayName?: string;  // Display name of the group for UI
   onDeleteGroup?: (identifier: string) => void; // Handler uses the identifier
-  groupTypeLabel?: string;   // Translated label for the group type (e.g., "Producto", "Categoría")
+  groupTypeLabel?: string;   // Label for the group type (e.g., "Producto", "Categoría")
   defaultCategoryKey: string; // Receive the key for the default category
 }
 
@@ -56,19 +55,19 @@ export function ExpenseList({
   groupTypeLabel, // Use generic prop (already translated if coming from parent)
   defaultCategoryKey // Use key
 }: ExpenseListProps) {
-  const { t, currentLocale } = useLocale(); // Use the hook
   const { toast } = useToast();
 
-  // Use translated defaults if props are not provided
-  const title = propTitle ?? t('list.defaultTitle');
-  const caption = propCaption ?? t('list.defaultCaption');
+  // Hardcoded Spanish defaults
+  const title = propTitle ?? 'Historial de Gastos';
+  const caption = propCaption ?? 'Lista de todos tus gastos.';
+  const defaultGroupType = 'Grupo';
 
 
   const handleDeleteClick = (expenseId: string) => {
      onDeleteExpense(expenseId);
      toast({
-        title: t('list.toast.expenseDeletedTitle'),
-        description: t('list.toast.expenseDeletedDescription'),
+        title: 'Gasto eliminado',
+        description: 'El gasto ha sido eliminado exitosamente.',
      });
   };
 
@@ -77,10 +76,8 @@ export function ExpenseList({
     if (onDeleteGroup) {
       onDeleteGroup(identifier);
       toast({
-        // Use the already translated groupTypeLabel passed from parent
-        title: t('list.toast.groupDeletedTitle', { groupType: groupTypeLabel || t('list.defaultGroupType') }),
-        // Use the groupDisplayName for the toast description
-        description: t('list.toast.groupDeletedDescription', { name: groupDisplayName || identifier }),
+        title: `${groupTypeLabel || defaultGroupType} eliminado`,
+        description: `Todas las entradas para "${groupDisplayName || identifier}" han sido eliminadas.`,
       });
     }
   };
@@ -93,7 +90,7 @@ export function ExpenseList({
           <CardTitle>{title}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">{t('list.noExpenses')}</p>
+          <p className="text-muted-foreground">No hay gastos para mostrar.</p>
         </CardContent>
       </Card>
     )
@@ -111,24 +108,21 @@ export function ExpenseList({
         {isSingleGroupView && groupName && ( // Ensure groupName exists
              <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    {/* Use groupTypeLabel and groupDisplayName in the button text */}
                     <Button variant="destructive" size="sm">
-                        <Trash2 className="mr-2 h-4 w-4" /> {t('list.deleteGroupButton', { groupType: groupTypeLabel, groupName: groupDisplayName || groupName })}
+                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar {groupTypeLabel} ({groupDisplayName || groupName})
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                    <AlertDialogTitle>{t('list.deleteConfirmTitle')}</AlertDialogTitle>
-                    {/* Use groupTypeLabel and groupDisplayName in the dialog description */}
+                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        {t('list.deleteConfirmDescription', { groupType: groupTypeLabel?.toLowerCase() || t('list.defaultGroupType').toLowerCase(), groupName: groupDisplayName || groupName })}
+                        Esta acción no se puede deshacer. Esto eliminará permanentemente todas las entradas para {groupTypeLabel?.toLowerCase() || defaultGroupType.toLowerCase()} "{groupDisplayName || groupName}".
                     </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                    <AlertDialogCancel>{t('list.cancelButton')}</AlertDialogCancel>
-                    {/* Use groupTypeLabel in the action button */}
+                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction onClick={() => handleDeleteGroupClick(groupName)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                         {t('list.deleteButton', { groupType: groupTypeLabel })}
+                         Eliminar {groupTypeLabel}
                     </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -140,11 +134,11 @@ export function ExpenseList({
           <TableCaption>{caption}</TableCaption>
           <TableHeader>
             <TableRow>
-                <TableHead>{t('list.header.product')}</TableHead>
-                <TableHead>{t('list.header.price')}</TableHead>
-                <TableHead>{t('list.header.category')}</TableHead>
-                <TableHead>{t('list.header.datetime')}</TableHead>
-                <TableHead className="text-right">{t('list.header.actions')}</TableHead>
+                <TableHead>Producto</TableHead>
+                <TableHead>Precio</TableHead>
+                <TableHead>Categoría</TableHead>
+                <TableHead>Fecha y Hora</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -159,31 +153,30 @@ export function ExpenseList({
                   <TableCell className="font-medium">{expense.product}</TableCell>
                   <TableCell>{formatCurrency(expense.price)}</TableCell>
                   <TableCell>
-                      {/* Translate category name for display, use key for comparison */}
                       <Badge variant={expense.category === defaultCategoryKey ? 'secondary' : 'outline'}>
-                          {expense.category === defaultCategoryKey ? t(defaultCategoryKey) : expense.category}
+                          {expense.category} {/* Display stored category name directly */}
                       </Badge>
                   </TableCell>
-                  <TableCell>{formatDate(expense.timestamp, currentLocale)}</TableCell> {/* Pass locale */}
+                  <TableCell>{formatDate(expense.timestamp)}</TableCell> {/* Use default locale (Spanish) */}
                   <TableCell className="text-right">
                       <AlertDialog>
                           <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon">
                                   <Trash2 className="h-4 w-4 text-destructive" />
-                                  <span className="sr-only">{t('list.deleteAction')}</span>
+                                  <span className="sr-only">Eliminar</span>
                               </Button>
                           </AlertDialogTrigger>
                           <AlertDialogContent>
                               <AlertDialogHeader>
-                                  <AlertDialogTitle>{t('list.deleteConfirmTitle')}</AlertDialogTitle>
+                                  <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                      {t('list.deleteSingleConfirmDescription', { product: expense.product, price: formatCurrency(expense.price) })}
+                                      Esta acción no se puede deshacer. Esto eliminará permanentemente el gasto "{expense.product}" con precio {formatCurrency(expense.price)}.
                                   </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
-                                  <AlertDialogCancel>{t('list.cancelButton')}</AlertDialogCancel>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                   <AlertDialogAction onClick={() => handleDeleteClick(expense.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                                      {t('list.deleteSingleButton')}
+                                      Eliminar Gasto
                                   </AlertDialogAction>
                               </AlertDialogFooter>
                           </AlertDialogContent>

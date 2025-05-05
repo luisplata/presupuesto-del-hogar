@@ -7,14 +7,13 @@ import { filterExpensesByPeriod, calculateTotal, formatCurrency } from '@/lib/da
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
-import { useLocale } from '@/hooks/useLocale'; // Import useLocale
+
 
 interface ExpenseSummaryProps {
   expenses: Expense[];
 }
 
 export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
-  const { t, isLoaded } = useLocale(); // Use the hook, get isLoaded state
   const [isClient, setIsClient] = useState(false); // State to track client-side mount
 
   // Calculated values - initialize with defaults or null
@@ -45,37 +44,37 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
 
   }, [expenses]); // Recalculate when expenses change
 
-  // Render loading state or actual content based on isClient and isLoaded
+  // Render loading state or actual content based on isClient and total calculation
   const renderContent = (period: 'week' | 'bi-weekly' | 'month') => {
       let total: number | null;
       let count: number;
-      let titleKey: string;
-      let periodNameKey: string;
+      let titleText: string;
+      let periodNameText: string;
 
 
       switch (period) {
           case 'week':
               total = weeklyTotal;
               count = weeklyCount;
-              titleKey = 'summary.weeklyTotal';
-              periodNameKey = 'summary.periodWeek';
+              titleText = 'Total Gastado esta Semana';
+              periodNameText = 'semana';
               break;
           case 'bi-weekly':
               total = biWeeklyTotal;
               count = biWeeklyCount;
-              titleKey = 'summary.biWeeklyTotal';
-              periodNameKey = 'summary.periodBiWeek';
+              titleText = 'Total Gastado esta Quincena';
+              periodNameText = 'quincena';
               break;
           case 'month':
               total = monthlyTotal;
               count = monthlyCount;
-              titleKey = 'summary.monthlyTotal';
-              periodNameKey = 'summary.periodMonth';
+              titleText = 'Total Gastado este Mes';
+              periodNameText = 'mes';
               break;
       }
 
-       // Show skeleton if not client, not loaded, or total is still null (calculating)
-       if (!isClient || !isLoaded || total === null) {
+       // Show skeleton if not client or total is still null (calculating)
+       if (!isClient || total === null) {
           return (
                 <div className="mt-4 p-4 rounded-md border bg-card space-y-2">
                     <Skeleton className="h-6 w-3/4" />
@@ -88,9 +87,9 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
        // Render actual content once loaded
        return (
             <div className="mt-4 p-4 rounded-md border bg-card">
-                <h3 className="text-lg font-semibold">{t(titleKey)}</h3>
+                <h3 className="text-lg font-semibold">{titleText}</h3>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(total)}</p>
-                <p className="text-sm text-muted-foreground">{t('summary.countDescription', { count, period: t(periodNameKey) })}</p>
+                <p className="text-sm text-muted-foreground">{count} gasto(s) esta {periodNameText}.</p>
             </div>
        );
   }
@@ -100,17 +99,17 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
     <Card>
         <CardHeader>
           {/* Conditionally render title or skeleton */}
-          <CardTitle>{isLoaded ? t('summary.title') : <Skeleton className="h-6 w-1/2" />}</CardTitle>
+          <CardTitle>{isClient ? 'Resumen de Gastos' : <Skeleton className="h-6 w-1/2" />}</CardTitle>
         </CardHeader>
         <CardContent>
              <Tabs defaultValue="week" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                     {/* Conditionally render triggers or skeletons */}
-                    {isLoaded ? (
+                    {isClient ? (
                         <>
-                            <TabsTrigger value="week">{t('summary.tabWeek')}</TabsTrigger>
-                            <TabsTrigger value="bi-weekly">{t('summary.tabBiWeek')}</TabsTrigger>
-                            <TabsTrigger value="month">{t('summary.tabMonth')}</TabsTrigger>
+                            <TabsTrigger value="week">Semana</TabsTrigger>
+                            <TabsTrigger value="bi-weekly">Quincena</TabsTrigger>
+                            <TabsTrigger value="month">Mes</TabsTrigger>
                         </>
                      ) : (
                          <>

@@ -7,7 +7,7 @@ import { ExpenseList } from './ExpenseList';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { useLocale } from '@/hooks/useLocale'; // Import useLocale
+
 
 interface CategoryHistoryProps {
   expenses: Expense[];
@@ -33,7 +33,6 @@ const filterExpensesByCategory = (expenses: Expense[], selectedIdentifier: strin
 };
 
 export function CategoryHistory({ expenses, onDeleteExpense, onDeleteCategory, defaultCategoryKey }: CategoryHistoryProps) {
-  const { t } = useLocale(); // Use the hook
   const [selectedCategoryIdentifier, setSelectedCategoryIdentifier] = useState<string>('all'); // State holds the key or name
 
   const uniqueCategoryIdentifiers = useMemo(() => getUniqueCategoryIdentifiers(expenses, defaultCategoryKey), [expenses, defaultCategoryKey]);
@@ -45,50 +44,44 @@ export function CategoryHistory({ expenses, onDeleteExpense, onDeleteCategory, d
      }
   }, []);
 
-  // Translate the selected identifier for display purposes
-  const translatedSelectedCategory = selectedCategoryIdentifier === 'all' ? t('history.allCategoriesOption') :
-                                      selectedCategoryIdentifier === defaultCategoryKey ? t(defaultCategoryKey) : selectedCategoryIdentifier;
+  // Hardcoded Spanish text
+  const selectedCategoryDisplay = selectedCategoryIdentifier === 'all' ? 'Todas las Categorías' : selectedCategoryIdentifier;
 
-  const title = selectedCategoryIdentifier === 'all' ? t('history.allCategories') : `${t('history.categoryHistoryPrefix')} ${translatedSelectedCategory}`;
-  const caption = selectedCategoryIdentifier === 'all' ? t('history.allExpensesCaption') : `${t('history.categoryExpensesCaptionPrefix')} ${translatedSelectedCategory}.`;
+  const title = selectedCategoryIdentifier === 'all' ? 'Historial Completo por Categoría' : `Historial de ${selectedCategoryDisplay}`;
+  const caption = selectedCategoryIdentifier === 'all' ? 'Todos los gastos registrados.' : `Gastos registrados para la categoría ${selectedCategoryDisplay}.`;
 
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('history.titleByCategory')}</CardTitle>
+        <CardTitle>Historial por Categoría</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <Label htmlFor="category-select">{t('history.selectCategoryLabel')}:</Label>
+          <Label htmlFor="category-select">Seleccionar Categoría:</Label>
           <Select onValueChange={handleCategoryChange} value={selectedCategoryIdentifier}>
             <SelectTrigger id="category-select" className="w-full md:w-[280px] mt-1">
-              {/* Display translated value */}
-              <SelectValue placeholder={t('history.selectCategoryPlaceholder')}>
-                  {translatedSelectedCategory}
+              <SelectValue placeholder="Seleccionar Categoría">
+                  {selectedCategoryDisplay}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {uniqueCategoryIdentifiers.map(identifier => (
                 <SelectItem key={identifier} value={identifier}>
-                  {/* Translate display text */}
-                  {identifier === 'all' ? t('history.allCategoriesOption') :
-                   identifier === defaultCategoryKey ? t(defaultCategoryKey) : identifier}
+                  {identifier === 'all' ? 'Todas las Categorías' : identifier}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Pass down the selected identifier (key or name) and the translated type label */}
         <ExpenseList
             expenses={filteredExpenses}
             onDeleteExpense={onDeleteExpense}
             groupName={selectedCategoryIdentifier !== 'all' ? selectedCategoryIdentifier : undefined} // Pass the identifier
             onDeleteGroup={selectedCategoryIdentifier !== 'all' ? onDeleteCategory : undefined}
-            // Translate the group type label and the name for the delete button/dialog
-            groupTypeLabel={selectedCategoryIdentifier !== 'all' ? t('history.categoryTypeLabel') : undefined}
-            groupDisplayName={translatedSelectedCategory} // Pass translated name for UI display in ExpenseList
+            groupTypeLabel={selectedCategoryIdentifier !== 'all' ? 'Categoría' : undefined} // Hardcoded Spanish label
+            groupDisplayName={selectedCategoryDisplay} // Pass display name for UI display in ExpenseList
             title={title}
             caption={caption}
             defaultCategoryKey={defaultCategoryKey} // Pass default category key down

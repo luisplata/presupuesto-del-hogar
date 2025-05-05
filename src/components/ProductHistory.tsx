@@ -7,7 +7,7 @@ import { ExpenseList } from './ExpenseList';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { useLocale } from '@/hooks/useLocale'; // Import useLocale
+
 
 interface ProductHistoryProps {
   expenses: Expense[];
@@ -32,7 +32,6 @@ const filterExpenses = (expenses: Expense[], selectedProduct: string): Expense[]
 };
 
 export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct, defaultCategoryKey }: ProductHistoryProps) {
-  const { t } = useLocale(); // Use the hook
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
 
   const uniqueProducts = useMemo(() => getUniqueProducts(expenses), [expenses]);
@@ -44,42 +43,42 @@ export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct, def
      }
   }, []);
 
-  const title = selectedProduct === 'all' ? t('history.allProducts') : `${t('history.productHistoryPrefix')} ${selectedProduct}`;
-  const caption = selectedProduct === 'all' ? t('history.allExpensesCaption') : `${t('history.productExpensesCaptionPrefix')} ${selectedProduct}.`;
+  // Hardcoded Spanish text
+  const selectedProductDisplay = selectedProduct === 'all' ? 'Todos los Productos' : selectedProduct;
+  const title = selectedProduct === 'all' ? 'Historial Completo por Producto' : `Historial de ${selectedProduct}`;
+  const caption = selectedProduct === 'all' ? 'Todos los gastos registrados.' : `Gastos registrados para ${selectedProduct}.`;
 
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('history.titleByProduct')}</CardTitle>
+        <CardTitle>Historial por Producto</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <Label htmlFor="product-select">{t('history.selectProductLabel')}:</Label>
+          <Label htmlFor="product-select">Seleccionar Producto:</Label>
           <Select onValueChange={handleProductChange} value={selectedProduct}>
             <SelectTrigger id="product-select" className="w-full md:w-[280px] mt-1">
-               {/* Display selected value */}
-              <SelectValue placeholder={t('history.selectProductPlaceholder')}>
-                {selectedProduct === 'all' ? t('history.allProductsOption') : selectedProduct}
+              <SelectValue placeholder="Seleccionar Producto">
+                {selectedProductDisplay}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {uniqueProducts.map(product => (
                 <SelectItem key={product} value={product}>
-                  {product === 'all' ? t('history.allProductsOption') : product}
+                  {product === 'all' ? 'Todos los Productos' : product}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Use the generic group deletion props for ExpenseList */}
         <ExpenseList
             expenses={filteredExpenses}
             onDeleteExpense={onDeleteExpense}
             groupName={selectedProduct !== 'all' ? selectedProduct : undefined}
             onDeleteGroup={selectedProduct !== 'all' ? onDeleteProduct : undefined}
-            groupTypeLabel={selectedProduct !== 'all' ? t('history.productTypeLabel') : undefined}
+            groupTypeLabel={selectedProduct !== 'all' ? 'Producto' : undefined} // Hardcoded Spanish label
             groupDisplayName={selectedProduct !== 'all' ? selectedProduct : undefined} // Product name is the display name
             title={title}
             caption={caption}

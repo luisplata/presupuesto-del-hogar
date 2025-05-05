@@ -15,17 +15,14 @@ import { Button } from '@/components/ui/button'; // Import Button
 import { Download, Upload } from 'lucide-react'; // Import Download and Upload icons
 import { formatDate, formatCurrency, safelyParseDate } from '@/lib/dateUtils'; // Import formatters and safelyParseDate
 import Head from 'next/head'; // Import Head for page-specific metadata
-import { useLocale } from '@/hooks/useLocale'; // Import the useLocale hook
-import { LanguageSelector } from '@/components/LanguageSelector'; // Import LanguageSelector
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Import Card components
 import { useToast } from '@/hooks/use-toast'; // Import useToast
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for loading state
 
-const DEFAULT_CATEGORY_KEY = 'category.undefined'; // Key for the default category
+const DEFAULT_CATEGORY_KEY = 'no definido'; // Key for the default category (now hardcoded Spanish)
 
 export default function Home() {
-  const { t, currentLocale, isLoaded } = useLocale(); // Use the hook, get isLoaded state
   const { toast } = useToast(); // Use toast for feedback
 
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
@@ -87,7 +84,14 @@ export default function Home() {
 
 
   const handleExportToExcel = () => {
-     if (typeof window === 'undefined' || !isLoaded) return; // Ensure translations are loaded
+     if (typeof window === 'undefined') return;
+
+    const excelHeaders = {
+        product: 'Producto',
+        price: 'Precio',
+        category: 'Categoría',
+        datetime: 'Fecha y Hora'
+    };
 
     const dataToExport = expenses
        .sort((a, b) => {
@@ -96,15 +100,15 @@ export default function Home() {
          return timeB - timeA;
        })
        .map(exp => ({
-          [t('excel.product')]: exp.product,
-          [t('excel.price')]: exp.price, // Keep as number
-          [t('excel.category')]: exp.category === DEFAULT_CATEGORY_KEY ? t(DEFAULT_CATEGORY_KEY) : exp.category,
-          [t('excel.datetime')]: formatDate(exp.timestamp, currentLocale), // Format date for readability
+          [excelHeaders.product]: exp.product,
+          [excelHeaders.price]: exp.price, // Keep as number
+          [excelHeaders.category]: exp.category, // Use the stored category name directly
+          [excelHeaders.datetime]: formatDate(exp.timestamp), // Format date for readability (uses default Spanish locale now)
        }));
 
     const worksheet = XLSX.utils.json_to_sheet(dataToExport);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, t('excel.sheetName'));
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Gastos'); // Hardcoded sheet name
 
     worksheet['!cols'] = [ { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 25 } ];
 
@@ -113,7 +117,7 @@ export default function Home() {
 
     const date = new Date();
     const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
-    const fileName = `${t('excel.fileNamePrefix')}_${formattedDate}.xlsx`;
+    const fileName = `gastos_${formattedDate}.xlsx`; // Hardcoded file name prefix
 
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -126,7 +130,7 @@ export default function Home() {
 
   const handleImportFromExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !isLoaded) return; // Ensure translations are loaded
+    if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -137,10 +141,11 @@ export default function Home() {
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-        const productHeader = t('excel.product');
-        const priceHeader = t('excel.price');
-        const categoryHeader = t('excel.category');
-        const datetimeHeader = t('excel.datetime');
+        // Hardcoded Spanish headers
+        const productHeader = 'Producto';
+        const priceHeader = 'Precio';
+        const categoryHeader = 'Categoría';
+        const datetimeHeader = 'Fecha y Hora';
 
         const importedExpenses: Expense[] = [];
         const newCategories = new Set<string>(categories);
@@ -149,19 +154,16 @@ export default function Home() {
         jsonData.forEach((row: any, index: number) => {
            // Check for required headers
            if (!(productHeader in row) || !(priceHeader in row) || !(datetimeHeader in row)) {
-                console.warn(`Row ${index + 2} skipped: Missing required columns (Product, Price, Date & Time).`);
+                console.warn(`Fila ${index + 2} omitida: Faltan columnas requeridas (Producto, Precio, Fecha y Hora).`);
                 skippedCount++;
                 return;
            }
 
             const product = String(row[productHeader]);
             const price = Number(row[priceHeader]);
-            // Handle category: Use 'category.undefined' key if empty or missing
+            // Handle category: Use default key if empty or missing
             let category = categoryHeader in row ? String(row[categoryHeader]).trim() : '';
-             // Translate back from localized "undefined" to the key if necessary
-             if (category === t(DEFAULT_CATEGORY_KEY)) {
-                category = DEFAULT_CATEGORY_KEY;
-            } else if (!category) {
+            if (!category) {
                 category = DEFAULT_CATEGORY_KEY;
             }
 
@@ -169,7 +171,7 @@ export default function Home() {
             const timestamp = safelyParseDate(timestampStr); // Implement robust date parsing if needed
 
             if (!product || isNaN(price) || price <= 0 || !timestamp) {
-                console.warn(`Row ${index + 2} skipped: Invalid data (Product: ${product}, Price: ${price}, Timestamp: ${timestampStr})`);
+                console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${product}, Precio: ${price}, Fecha y Hora: ${timestampStr})`);
                 skippedCount++;
                 return; // Skip row with invalid data
             }
@@ -197,28 +199,28 @@ export default function Home() {
             );
             setCategories(Array.from(newCategories).sort());
             toast({
-                title: t('import.successTitle'),
-                description: t('import.successDescription', { count: importedExpenses.length, skipped: skippedCount }),
+                title: 'Importación Exitosa',
+                description: `${importedExpenses.length} gastos importados. Se omitieron ${skippedCount} filas debido a errores o datos faltantes.`,
             });
         } else if (skippedCount > 0) {
              toast({
-                title: t('import.errorTitle'),
-                description: t('import.errorDescriptionNoneImported', { skipped: skippedCount }),
+                title: 'Error de Importación',
+                description: `No se importaron gastos. Se omitieron ${skippedCount} filas debido a errores o datos faltantes.`,
                 variant: 'destructive',
             });
         } else {
              toast({
-                title: t('import.errorTitle'),
-                description: t('import.errorDescriptionNoData'),
+                title: 'Error de Importación',
+                description: 'No se encontraron datos de gastos válidos en el archivo.',
                 variant: 'destructive',
             });
         }
 
       } catch (error) {
-        console.error("Error importing file:", error);
+        console.error("Error al importar archivo:", error);
         toast({
-          title: t('import.errorTitle'),
-          description: t('import.genericError'),
+          title: 'Error de Importación',
+          description: 'Ocurrió un error al importar el archivo. Por favor, verifica el formato del archivo e inténtalo de nuevo.',
           variant: 'destructive',
         });
       } finally {
@@ -231,41 +233,24 @@ export default function Home() {
     reader.readAsBinaryString(file);
   };
 
-  // Display loading state if translations are not ready
-  if (!isLoaded) {
-    return (
-        <main className="container mx-auto p-4 min-h-screen">
-             <header className="mb-8 text-center relative">
-                <Skeleton className="h-8 w-1/2 mx-auto" />
-                <Skeleton className="h-4 w-3/4 mx-auto mt-2" />
-             </header>
-             <Skeleton className="h-10 w-full mb-6" />
-             <Skeleton className="h-96 w-full" />
-        </main>
-    );
-  }
-
-
   return (
     <>
       <Head>
-          <title>{t('home.title')}</title>
-          <meta name="description" content={t('home.description')} />
+          <title>Control de Gastos</title>
+          <meta name="description" content="Registra y analiza tus gastos fácilmente." />
       </Head>
       <main className="container mx-auto p-4 min-h-screen">
           <header className="mb-8 text-center relative">
-            <div className="absolute top-0 right-0 p-2 z-10"> {/* Ensure selector is above tabs */}
-                <LanguageSelector />
-            </div>
-            <h1 className="text-3xl font-bold text-foreground">{t('home.title')}</h1>
-            <p className="text-muted-foreground">{t('home.description')}</p>
+            {/* Removed LanguageSelector */}
+            <h1 className="text-3xl font-bold text-foreground">Control de Gastos</h1>
+            <p className="text-muted-foreground">Registra y analiza tus gastos fácilmente.</p>
          </header>
 
         <Tabs defaultValue="control" className="w-full">
           <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="control">{t('tabs.control')}</TabsTrigger>
-            <TabsTrigger value="reporting">{t('tabs.reporting')}</TabsTrigger>
-            <TabsTrigger value="data">{t('tabs.data')}</TabsTrigger>
+            <TabsTrigger value="control">Control de gastos</TabsTrigger>
+            <TabsTrigger value="reporting">Reportería</TabsTrigger>
+            <TabsTrigger value="data">Exportar/Importar Data</TabsTrigger>
           </TabsList>
 
           {/* Tab 1: Control de Gastos */}
@@ -307,23 +292,23 @@ export default function Home() {
           <TabsContent value="data">
              <Card>
                 <CardHeader>
-                    <CardTitle>{t('tabs.data')}</CardTitle>
-                    <CardDescription>{t('dataTab.description')}</CardDescription>
+                    <CardTitle>Exportar/Importar Data</CardTitle>
+                    <CardDescription>Exporta tus datos de gastos actuales o importa datos desde un archivo Excel.</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col sm:flex-row gap-4">
                     {/* Export Button */}
                     {isClient && (
-                       <Button onClick={handleExportToExcel} variant="outline" disabled={!isLoaded}>
+                       <Button onClick={handleExportToExcel} variant="outline">
                           <Download className="mr-2 h-4 w-4" />
-                          {t('home.exportButton')}
+                          Exportar a Excel
                        </Button>
                     )}
                      {/* Import Button */}
                     {isClient && (
                         <>
-                            <Button onClick={() => fileInputRef.current?.click()} variant="outline" disabled={!isLoaded}>
+                            <Button onClick={() => fileInputRef.current?.click()} variant="outline">
                                 <Upload className="mr-2 h-4 w-4" />
-                                {t('dataTab.importButton')}
+                                Importar desde Excel
                             </Button>
                             <input
                                 type="file"
@@ -336,8 +321,8 @@ export default function Home() {
                     )}
                     {!isClient && (
                        <>
-                        <Button variant="outline" disabled><Download className="mr-2 h-4 w-4" /> {t('home.exportButton')}</Button>
-                        <Button variant="outline" disabled><Upload className="mr-2 h-4 w-4" /> {t('dataTab.importButton')}</Button>
+                        <Button variant="outline" disabled><Download className="mr-2 h-4 w-4" /> Exportar a Excel</Button>
+                        <Button variant="outline" disabled><Upload className="mr-2 h-4 w-4" /> Importar desde Excel</Button>
                        </>
                     )}
                 </CardContent>
