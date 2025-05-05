@@ -276,8 +276,8 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                         {/* Changed Bar to Line and Area components */}
                         {productKeys.map((productKey) => (
                              <React.Fragment key={productKey}>
-                                <Area // Area component for stacking
-                                    type="monotone"
+                                <Area // Area component for stacking - change type to linear
+                                    type="linear"
                                     dataKey={productKey}
                                     stackId="a" // Stack areas together
                                     stroke="none" // Area doesn't need a visible stroke itself
@@ -285,8 +285,8 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                     fillOpacity={0.6} // Make fill slightly transparent
                                     name={productKeysMap[productKey]} // Name for tooltip
                                  />
-                                <Line // Line component for the visual line edge
-                                     type="monotone"
+                                <Line // Line component for the visual line edge - change type to linear
+                                     type="linear"
                                      dataKey={productKey}
                                      stroke={`var(--color-${productKey})`} // Use product color for line
                                      strokeWidth={2}
