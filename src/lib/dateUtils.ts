@@ -1,5 +1,4 @@
 
-
 import {
   startOfWeek,
   endOfWeek,
@@ -12,7 +11,7 @@ import {
   endOfDay,
   format, // Import format for better control
 } from 'date-fns';
-import { es } from 'date-fns/locale'; // Import Spanish locale if needed
+import { es, enUS } from 'date-fns/locale'; // Import Spanish and English locales
 import type { Expense } from '@/types/expense';
 
 // Helper to safely parse date strings or use Date objects
@@ -91,10 +90,11 @@ export const calculateTotal = (expenses: Expense[]): number => {
   return expenses.reduce((sum, expense) => sum + (expense.price || 0), 0); // Handle potential undefined price
 };
 
-const COP_FORMATTER = new Intl.NumberFormat('es-CO', { // Use Spanish - Colombia locale
+// Keep using es-CO for currency formatting as it's specific to Colombian Pesos
+const COP_FORMATTER = new Intl.NumberFormat('es-CO', {
     style: 'currency',
-    currency: 'COP', // Set currency code to COP
-    minimumFractionDigits: 0, // COP typically doesn't use cents
+    currency: 'COP',
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
 });
 
@@ -111,27 +111,26 @@ export const parseCurrency = (formattedValue: string | number | null | undefined
     }
     // Convert to string if it's a number
     const stringValue = String(formattedValue);
-    // Remove non-digit characters (currency symbols, dots, commas) except for the decimal separator if needed
-    // For COP (no decimals), remove all non-digits.
+    // Remove non-digit characters
     const numericString = stringValue.replace(/[^\d]/g, '');
     const number = parseInt(numericString, 10);
     return isNaN(number) ? 0 : number; // Return 0 if parsing fails or result is NaN
 };
 
-
-export const formatDate = (date: Date | string | number): string => {
+// Updated formatDate to accept locale
+export const formatDate = (date: Date | string | number, locale: string = 'en'): string => {
     const validDate = safelyParseDate(date);
-    if (!validDate) return 'Fecha inválida';
+    if (!validDate) return 'Invalid date'; // Consider translating this
 
-    // Use date-fns format for flexible and localized date formatting
-    // Example: 'dd/MM/yyyy HH:mm:ss'
-    // Locale can be passed for month/day names: format(validDate, 'Pp', { locale: es })
+    // Determine the date-fns locale object based on the locale string
+    const dateFnsLocale = locale === 'es' ? es : enUS; // Default to enUS if not 'es'
+
     try {
-        return format(validDate, 'dd/MM/yyyy HH:mm', { locale: es }); // Format with Spanish locale
+        // Use date-fns format with the determined locale
+        return format(validDate, 'dd/MM/yyyy HH:mm', { locale: dateFnsLocale });
     } catch (error) {
         console.error("Error formatting date:", error, "Input date:", date, "Parsed date:", validDate);
         // Fallback or simpler format if locale causes issues
         return validDate.toLocaleDateString() + ' ' + validDate.toLocaleTimeString();
     }
 }
-

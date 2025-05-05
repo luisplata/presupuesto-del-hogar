@@ -7,12 +7,14 @@ import { filterExpensesByPeriod, calculateTotal, formatCurrency } from '@/lib/da
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
+import { useLocale } from '@/hooks/useLocale'; // Import useLocale
 
 interface ExpenseSummaryProps {
   expenses: Expense[];
 }
 
 export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
+  const { t } = useLocale(); // Use the hook
   const [isClient, setIsClient] = useState(false); // State to track client-side mount
 
   // Calculated values - initialize with defaults or null
@@ -47,28 +49,28 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
   const renderContent = (period: 'week' | 'bi-weekly' | 'month') => {
       let total: number | null;
       let count: number;
-      let title: string;
-      let periodName: string;
+      let titleKey: string;
+      let periodNameKey: string;
 
 
       switch (period) {
           case 'week':
               total = weeklyTotal;
               count = weeklyCount;
-              title = 'Total Gastado esta Semana';
-              periodName = 'semana';
+              titleKey = 'summary.weeklyTotal';
+              periodNameKey = 'summary.periodWeek';
               break;
           case 'bi-weekly':
               total = biWeeklyTotal;
               count = biWeeklyCount;
-              title = 'Total Gastado esta Quincena';
-              periodName = 'quincena';
+              titleKey = 'summary.biWeeklyTotal';
+              periodNameKey = 'summary.periodBiWeek';
               break;
           case 'month':
               total = monthlyTotal;
               count = monthlyCount;
-              title = 'Total Gastado este Mes';
-              periodName = 'mes';
+              titleKey = 'summary.monthlyTotal';
+              periodNameKey = 'summary.periodMonth';
               break;
       }
 
@@ -84,9 +86,9 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
 
        return (
             <div className="mt-4 p-4 rounded-md border bg-card">
-                <h3 className="text-lg font-semibold">{title}</h3>
+                <h3 className="text-lg font-semibold">{t(titleKey)}</h3>
                 <p className="text-2xl font-bold text-primary">{formatCurrency(total)}</p>
-                <p className="text-sm text-muted-foreground">{count} gasto(s) este {periodName}.</p>
+                <p className="text-sm text-muted-foreground">{t('summary.countDescription', { count, period: t(periodNameKey) })}</p>
             </div>
        );
   }
@@ -95,14 +97,14 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
   return (
     <Card>
         <CardHeader>
-          <CardTitle>Resumen de Gastos</CardTitle>
+          <CardTitle>{t('summary.title')}</CardTitle>
         </CardHeader>
         <CardContent>
              <Tabs defaultValue="week" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="week">Semana</TabsTrigger>
-                    <TabsTrigger value="bi-weekly">Quincena</TabsTrigger>
-                    <TabsTrigger value="month">Mes</TabsTrigger>
+                    <TabsTrigger value="week">{t('summary.tabWeek')}</TabsTrigger>
+                    <TabsTrigger value="bi-weekly">{t('summary.tabBiWeek')}</TabsTrigger>
+                    <TabsTrigger value="month">{t('summary.tabMonth')}</TabsTrigger>
                 </TabsList>
                 <TabsContent value="week">
                    {renderContent('week')}

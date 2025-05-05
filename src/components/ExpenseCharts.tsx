@@ -9,7 +9,7 @@ import {
     CartesianGrid,
     ResponsiveContainer,
 } from 'recharts';
-import { format, es } from 'date-fns';
+import { format as formatDateFns, es } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency } from '@/lib/dateUtils'; // Corrected import path
@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Corrected import paths for chart components
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart" // Removed ChartLegend, ChartLegendContent imports
+import { useLocale } from '@/hooks/useLocale'; // Import useLocale
 
 // Define the type for a single day's product expenses
 interface DailyProductExpense {
@@ -45,7 +46,8 @@ interface ExpenseChartsProps {
 // Function to aggregate expenses by day and product
 const aggregateStackedExpensesByDay = (
   expenses: Expense[],
-  days: number
+  days: number,
+  locale: string // Pass locale for date formatting
 ): AggregatedExpenses => {
   const today = new Date();
   const cutoffDate = new Date(today);
@@ -60,11 +62,12 @@ const aggregateStackedExpensesByDay = (
   } = {};
   const productKeysMap: { [key: string]: string } = {}; // Store original product names
   const allDates = new Set<string>();
+  const dateFnsLocale = locale === 'es' ? es : undefined; // Get date-fns locale
 
   // Initialize daily totals for all dates within the range
   let currentDate = new Date(cutoffDate);
   while (currentDate <= today) {
-    const formattedDate = format(currentDate, 'yyyy-MM-dd');
+    const formattedDate = formatDateFns(currentDate, 'yyyy-MM-dd');
     dailyTotals[formattedDate] = { total: 0, products: {} };
     allDates.add(formattedDate); // Add date to the set
     currentDate.setDate(currentDate.getDate() + 1);
@@ -76,7 +79,7 @@ const aggregateStackedExpensesByDay = (
     expenseDate.setHours(0, 0, 0, 0); // Consider only the date part
 
     if (expenseDate >= cutoffDate && expenseDate <= today) {
-      const formattedDate = format(expenseDate, 'yyyy-MM-dd');
+      const formattedDate = formatDateFns(expenseDate, 'yyyy-MM-dd');
       const productKey = expense.product; // Use product name as the key
 
       // Store original product name
@@ -99,7 +102,8 @@ const aggregateStackedExpensesByDay = (
   const aggregatedData = Array.from(allDates)
     .map(dateKey => {
       const dayData = dailyTotals[dateKey];
-      const displayDate = format(new Date(dateKey + 'T00:00:00'), 'dd MMM', { locale: es }); // Format for display
+      // Use date-fns for localized date formatting
+      const displayDate = formatDateFns(new Date(dateKey + 'T00:00:00'), 'dd MMM', { locale: dateFnsLocale });
 
       const productEntries = dayData ? dayData.products : {};
       const totalEntry = dayData ? dayData.total : 0;
@@ -152,6 +156,7 @@ const generateChartConfig = (productKeysMap: { [key: string]: string }): ChartCo
 
 
 export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
+    const { t, currentLocale } = useLocale(); // Use the locale hook
     const [isClient, setIsClient] = useState(false);
 
     // State for chart data and product keys for each period
@@ -165,20 +170,20 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
 
     useEffect(() => {
         setIsClient(true);
-        // Calculate data only on the client side
-        const data7 = aggregateStackedExpensesByDay(expenses, 7);
+        // Calculate data only on the client side, passing the current locale
+        const data7 = aggregateStackedExpensesByDay(expenses, 7, currentLocale);
         setChartData7Days(data7.data);
         setProductKeys7Days(data7.productKeys);
 
-        const data30 = aggregateStackedExpensesByDay(expenses, 30);
+        const data30 = aggregateStackedExpensesByDay(expenses, 30, currentLocale);
         setChartData30Days(data30.data);
         setProductKeys30Days(data30.productKeys);
 
-        const data90 = aggregateStackedExpensesByDay(expenses, 90);
+        const data90 = aggregateStackedExpensesByDay(expenses, 90, currentLocale);
         setChartData90Days(data90.data);
         setProductKeys90Days(data90.productKeys);
 
-    }, [expenses]); // Recalculate when expenses change
+    }, [expenses, currentLocale]); // Recalculate when expenses or locale change
 
     const renderChart = (data: DailyProductExpense[], productKeysMap: { [key: string]: string }, period: string) => {
         // Memoize chartConfig generation. Colors will be random but stable unless productKeysMap changes.
@@ -197,8 +202,8 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
 
          if (data.length === 0 || data.every(d => d.total === 0)) {
              const message = expenses.length === 0
-                 ? "Agrega gastos para ver el gráfico."
-                 : `No hay gastos en los últimos ${period} días.`;
+                 ? t('charts.addExpenses')
+                 : t('charts.noExpensesPeriod', { period }); // Use translation with interpolation
              return (
                  <div className="mt-4 p-4 rounded-md border bg-card text-center min-h-[350px] flex items-center justify-center">
                     <p className="text-muted-foreground">{message}</p>
@@ -258,7 +263,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                         return (
                                             <>
                                                 <div className="font-semibold mb-1">{label}</div>
-                                                <div className="text-muted-foreground border-t pt-1 mt-1">Total Día: {formatCurrency(dailyTotal)}</div>
+                                                <div className="text-muted-foreground border-t pt-1 mt-1">{t('charts.tooltipDailyTotal')}: {formatCurrency(dailyTotal)}</div>
                                             </>
                                         );
                                     }}
@@ -306,14 +311,14 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Análisis de Gastos por Día y Producto (Gráfico de Área Apilada)</CardTitle>
+        <CardTitle>{t('charts.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="7days" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="7days">Últimos 7 Días</TabsTrigger>
-            <TabsTrigger value="30days">Últimos 30 Días</TabsTrigger>
-            <TabsTrigger value="90days">Últimos 90 Días</TabsTrigger>
+            <TabsTrigger value="7days">{t('charts.tab7days')}</TabsTrigger>
+            <TabsTrigger value="30days">{t('charts.tab30days')}</TabsTrigger>
+            <TabsTrigger value="90days">{t('charts.tab90days')}</TabsTrigger>
           </TabsList>
           <TabsContent value="7days">
             {renderChart(chartData7Days, productKeys7Days, "7")}
