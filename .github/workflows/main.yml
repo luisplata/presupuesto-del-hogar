@@ -2,12 +2,9 @@ name: Deploy Next.js App in server
 
 on:
   workflow_dispatch: {}
-  pull_request:
-    branches:
-      - deploy
   push:
     branches:
-      - main
+      - deploy
 
 jobs:
   export-and-deploy:
