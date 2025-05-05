@@ -56,22 +56,36 @@ const getNestedValue = (obj: Translations, key: string): string | undefined => {
 // Create the provider component
 export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
   const router = useRouter();
-  const [locale, setLocaleState] = useState<string>(router.locale || router.defaultLocale || 'en');
+  // Initialize state with the most likely default, will be updated by useEffect
+  const [locale, setLocaleState] = useState<string>(router.defaultLocale || 'en');
 
-  // Update locale state if router locale changes
+  // Update locale state if router locale changes (runs client-side)
   useEffect(() => {
-    setLocaleState(router.locale || router.defaultLocale || 'en');
-  }, [router.locale, router.defaultLocale]);
+    // Use router.isReady to ensure router fields are populated client-side
+    if (router.isReady) {
+      const currentRouterLocale = router.locale || router.defaultLocale || 'en';
+      if (locale !== currentRouterLocale) {
+        setLocaleState(currentRouterLocale);
+      }
+    }
+  }, [router.isReady, router.locale, router.defaultLocale, locale]); // Depend on router readiness and locale info
 
   const setLocale = useCallback((newLocale: string) => {
-    if (router.locales?.includes(newLocale)) {
-      // Keep existing query parameters
-      router.push(router.pathname, router.asPath, { locale: newLocale, shallow: false }); // Use shallow: false to ensure re-render with new locale data
-      // No need to call setLocaleState here, useEffect will handle it
-    } else {
-        console.warn(`Locale "${newLocale}" is not supported.`);
+     // Ensure router is ready before attempting to push
+    if (!router.isReady) {
+        console.warn("Router not ready, skipping locale change");
+        return;
     }
-  }, [router]);
+    if (router.locales?.includes(newLocale) && newLocale !== locale) {
+      // Keep existing query parameters, change locale
+      router.push({ pathname: router.pathname, query: router.query }, router.asPath, { locale: newLocale });
+      // State update will be triggered by the useEffect above when router.locale changes
+    } else if (newLocale === locale) {
+        // Do nothing if locale is already set
+    } else {
+        console.warn(`Locale "${newLocale}" is not supported or router is not ready.`);
+    }
+  }, [router, locale]); // Depend on the whole router object and current locale
 
 
   // Translation function
@@ -80,12 +94,15 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
       let translation = getNestedValue(currentTranslations, key);
 
       if (translation === undefined) {
-        console.warn(`Translation key "${key}" not found for locale "${locale}"`);
+        // Avoid excessive warnings for common keys like favicon during dev
+        if (key !== 'favicon.ico') {
+            console.warn(`Translation key "${key}" not found for locale "${locale}"`);
+        }
         translation = key; // Return the key if not found
       }
 
       // Handle interpolation
-      if (options && translation) {
+      if (options && typeof translation === 'string') {
         Object.keys(options).forEach(placeholder => {
             const regex = new RegExp(`{{${placeholder}}}`, 'g');
             translation = translation!.replace(regex, String(options[placeholder]));

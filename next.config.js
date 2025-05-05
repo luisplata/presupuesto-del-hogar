@@ -48,9 +48,8 @@ const nextConfig = {
     //     defaultLocale: 'fr',
     //   },
     // ],
-    localeDetection: true, // Automatically detect the user's preferred locale
+    localeDetection: false, // Disable automatic locale detection
   },
 };
 
 module.exports = nextConfig;
-
