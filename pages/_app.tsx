@@ -1,20 +1,17 @@
 
 import type { AppProps } from 'next/app';
-import { GeistSans } from 'geist/font/sans'; // Import from geist package
-import { GeistMono } from 'geist/font/mono';   // Import from geist package
 import '@/app/globals.css'; // Import global styles
+// Removed direct Geist font CSS imports causing errors
+// import 'geist/font/sans.css';
+// import 'geist/font/mono.css';
 import { Toaster } from "@/components/ui/toaster"; // Ensure Toaster is imported
 
-// No need for applyFontVariables function when using CSS variables this way
+// The application will now rely on the fallback fonts specified in globals.css
 
 function MyApp({ Component, pageProps }: AppProps) {
   return (
-    // Apply font variables to the root using class names provided by the font objects
-    // Also apply them inline for broader compatibility if needed, though classes are preferred
-    <div className={`${GeistSans.variable} ${GeistMono.variable}`} style={{
-      '--font-geist-sans': GeistSans.style.fontFamily,
-      '--font-geist-mono': GeistMono.style.fontFamily,
-    } as React.CSSProperties}>
+    // The font-family is applied in globals.css, now using fallback fonts
+    <div>
       <Component {...pageProps} />
       <Toaster /> {/* Render the Toaster globally */}
     </div>
