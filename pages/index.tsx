@@ -20,11 +20,12 @@ import { LanguageSelector } from '@/components/LanguageSelector'; // Import Lang
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Import Card components
 import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for loading state
 
 const DEFAULT_CATEGORY_KEY = 'category.undefined'; // Key for the default category
 
 export default function Home() {
-  const { t, currentLocale } = useLocale(); // Use the hook
+  const { t, currentLocale, isLoaded } = useLocale(); // Use the hook, get isLoaded state
   const { toast } = useToast(); // Use toast for feedback
 
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
@@ -86,7 +87,7 @@ export default function Home() {
 
 
   const handleExportToExcel = () => {
-     if (typeof window === 'undefined') return;
+     if (typeof window === 'undefined' || !isLoaded) return; // Ensure translations are loaded
 
     const dataToExport = expenses
        .sort((a, b) => {
@@ -125,7 +126,7 @@ export default function Home() {
 
   const handleImportFromExcel = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !isLoaded) return; // Ensure translations are loaded
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -230,6 +231,21 @@ export default function Home() {
     reader.readAsBinaryString(file);
   };
 
+  // Display loading state if translations are not ready
+  if (!isLoaded) {
+    return (
+        <main className="container mx-auto p-4 min-h-screen">
+             <header className="mb-8 text-center relative">
+                <Skeleton className="h-8 w-1/2 mx-auto" />
+                <Skeleton className="h-4 w-3/4 mx-auto mt-2" />
+             </header>
+             <Skeleton className="h-10 w-full mb-6" />
+             <Skeleton className="h-96 w-full" />
+        </main>
+    );
+  }
+
+
   return (
     <>
       <Head>
@@ -297,7 +313,7 @@ export default function Home() {
                 <CardContent className="flex flex-col sm:flex-row gap-4">
                     {/* Export Button */}
                     {isClient && (
-                       <Button onClick={handleExportToExcel} variant="outline">
+                       <Button onClick={handleExportToExcel} variant="outline" disabled={!isLoaded}>
                           <Download className="mr-2 h-4 w-4" />
                           {t('home.exportButton')}
                        </Button>
@@ -305,7 +321,7 @@ export default function Home() {
                      {/* Import Button */}
                     {isClient && (
                         <>
-                            <Button onClick={() => fileInputRef.current?.click()} variant="outline">
+                            <Button onClick={() => fileInputRef.current?.click()} variant="outline" disabled={!isLoaded}>
                                 <Upload className="mr-2 h-4 w-4" />
                                 {t('dataTab.importButton')}
                             </Button>
@@ -334,5 +350,3 @@ export default function Home() {
     </>
   );
 }
- 
-    

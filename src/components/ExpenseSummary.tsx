@@ -14,7 +14,7 @@ interface ExpenseSummaryProps {
 }
 
 export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
-  const { t } = useLocale(); // Use the hook
+  const { t, isLoaded } = useLocale(); // Use the hook, get isLoaded state
   const [isClient, setIsClient] = useState(false); // State to track client-side mount
 
   // Calculated values - initialize with defaults or null
@@ -45,7 +45,7 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
 
   }, [expenses]); // Recalculate when expenses change
 
-  // Render loading state or actual content based on isClient
+  // Render loading state or actual content based on isClient and isLoaded
   const renderContent = (period: 'week' | 'bi-weekly' | 'month') => {
       let total: number | null;
       let count: number;
@@ -74,7 +74,8 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
               break;
       }
 
-       if (!isClient || total === null) {
+       // Show skeleton if not client, not loaded, or total is still null (calculating)
+       if (!isClient || !isLoaded || total === null) {
           return (
                 <div className="mt-4 p-4 rounded-md border bg-card space-y-2">
                     <Skeleton className="h-6 w-3/4" />
@@ -84,6 +85,7 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
           )
        }
 
+       // Render actual content once loaded
        return (
             <div className="mt-4 p-4 rounded-md border bg-card">
                 <h3 className="text-lg font-semibold">{t(titleKey)}</h3>
@@ -97,14 +99,26 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
   return (
     <Card>
         <CardHeader>
-          <CardTitle>{t('summary.title')}</CardTitle>
+          {/* Conditionally render title or skeleton */}
+          <CardTitle>{isLoaded ? t('summary.title') : <Skeleton className="h-6 w-1/2" />}</CardTitle>
         </CardHeader>
         <CardContent>
              <Tabs defaultValue="week" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="week">{t('summary.tabWeek')}</TabsTrigger>
-                    <TabsTrigger value="bi-weekly">{t('summary.tabBiWeek')}</TabsTrigger>
-                    <TabsTrigger value="month">{t('summary.tabMonth')}</TabsTrigger>
+                    {/* Conditionally render triggers or skeletons */}
+                    {isLoaded ? (
+                        <>
+                            <TabsTrigger value="week">{t('summary.tabWeek')}</TabsTrigger>
+                            <TabsTrigger value="bi-weekly">{t('summary.tabBiWeek')}</TabsTrigger>
+                            <TabsTrigger value="month">{t('summary.tabMonth')}</TabsTrigger>
+                        </>
+                     ) : (
+                         <>
+                             <Skeleton className="h-9 w-full" />
+                             <Skeleton className="h-9 w-full" />
+                             <Skeleton className="h-9 w-full" />
+                         </>
+                     )}
                 </TabsList>
                 <TabsContent value="week">
                    {renderContent('week')}

@@ -8,5 +8,6 @@ export const useLocale = () => {
   if (!context) {
     throw new Error('useLocale must be used within a LocaleProvider');
   }
+  // Return the whole context including locale, setLocale, t, currentLocale, and isLoaded
   return context;
 };
