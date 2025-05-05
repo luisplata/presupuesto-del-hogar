@@ -138,8 +138,8 @@ const generateChartConfig = (productKeysMap: { [key: string]: string }): ChartCo
         // Generate random HSL values for better visual distinction
         const hue = Math.floor(Math.random() * 360);
         // Keep saturation and lightness in ranges that provide decent visibility
-        const saturation = Math.floor(Math.random() * 31) + 60; // 60-90%
-        const lightness = Math.floor(Math.random() * 31) + 40; // 40-70%
+        const saturation = Math.floor(Math.random() * 41) + 50; // 50-90% saturation
+        const lightness = Math.floor(Math.random() * 31) + 50; // 50-80% lightness (further from black)
         const randomColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 
         config[key] = {
@@ -319,4 +319,3 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
     </Card>
   );
 }
-
