@@ -16,8 +16,11 @@ import { Download } from 'lucide-react'; // Import Download icon
 import { formatDate, formatCurrency } from '@/lib/dateUtils'; // Import formatters
 import Head from 'next/head'; // Import Head for page-specific metadata
 
+const DEFAULT_CATEGORY = 'no definido';
+
 export default function Home() {
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
+  const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY]);
 
   // Client-side state to prevent hydration mismatch for export button
   const [isClient, setIsClient] = useState(false);
@@ -27,11 +30,20 @@ export default function Home() {
 
 
   const handleAddExpense = (newExpenseData: Omit<Expense, 'id' | 'timestamp'>) => {
-    const newExpense: Expense = {
+     const categoryToAdd = (newExpenseData.category?.trim() || DEFAULT_CATEGORY); // Default if empty/whitespace
+
+     const newExpense: Expense = {
       ...newExpenseData,
+      category: categoryToAdd, // Ensure category is set
       id: uuidv4(),
       timestamp: new Date(), // Store as Date object
     };
+
+    // Add new category to the list if it doesn't exist
+    if (!categories.includes(categoryToAdd)) {
+      setCategories(prevCategories => [...prevCategories, categoryToAdd].sort());
+    }
+
     setExpenses(prevExpenses => [...prevExpenses, newExpense].sort((a, b) => {
        // Safely convert timestamps to numbers for comparison
        const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
@@ -63,6 +75,7 @@ export default function Home() {
        .map(exp => ({
           Producto: exp.product,
           Precio: exp.price, // Keep as number for Excel calculations
+          Categoría: exp.category, // Add category column
           'Fecha y Hora': formatDate(exp.timestamp), // Format date for readability
        }));
 
@@ -71,8 +84,8 @@ export default function Home() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Gastos");
 
-    // Optional: Adjust column widths (example)
-    worksheet['!cols'] = [ { wch: 20 }, { wch: 10 }, { wch: 25 } ]; // Adjust widths as needed
+    // Optional: Adjust column widths (example) - added width for category
+    worksheet['!cols'] = [ { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 25 } ]; // Adjust widths as needed
 
     // 3. Generate Excel file and trigger download
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -116,7 +129,7 @@ export default function Home() {
 
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1">
-             <ExpenseForm onAddExpense={handleAddExpense} />
+             <ExpenseForm onAddExpense={handleAddExpense} categories={categories} />
           </div>
 
           <div className="md:col-span-2 space-y-6">
