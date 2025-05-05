@@ -105,5 +105,3 @@
   "import.errorDescriptionNoData": "No valid expense data found in the file.",
   "import.genericError": "An error occurred while importing the file. Please check the file format and try again."
 }
- 
-    

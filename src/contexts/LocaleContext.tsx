@@ -1,9 +1,7 @@
 
 // src/contexts/LocaleContext.tsx
-import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-// Removed useRouter import as we are managing locale client-side now
-import en from '@/locales/en.json';
-import es from '@/locales/es.json';
+import React, { createContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+
 import useLocalStorage from '@/hooks/useLocalStorage'; // Import useLocalStorage
 
 // Define the structure of your translations
@@ -21,20 +19,6 @@ interface LocaleContextType {
   t: (key: string, options?: Record<string, string | number>) => string; // Add interpolation options
   currentLocale: string;
 }
-
-// Default locale determination (client-side only)
-const getDefaultLocale = (): string => {
-    if (typeof window === 'undefined') return 'en'; // Default on server
-    // Check localStorage first
-    const storedLocale = window.localStorage.getItem('locale');
-    if (storedLocale && ['en', 'es'].includes(storedLocale)) {
-        return storedLocale;
-    }
-    // Fallback to browser language
-    const browserLang = navigator.language.split('-')[0];
-    return ['en', 'es'].includes(browserLang) ? browserLang : 'en'; // Default to 'en'
-};
-
 // Create the context with a default value
 export const LocaleContext = createContext<LocaleContextType>({
   locale: 'en', // Sensible default
@@ -48,39 +32,89 @@ interface LocaleProviderProps {
   children: ReactNode;
 }
 
-const translations: Record<string, Translations> = { en, es };
+const loadMessages = async (locale: string): Promise<Translations> => {
+  console.log('loadMessages called with locale:', locale);
+  try {
+      // Construct the correct path relative to the public directory
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/locales/${locale}.json`);
+      if (response.ok) {
+          const loadedTranslations = await response.json();
+          return loadedTranslations; // Return the fetched JSON
+      } else {
+          console.error(`Failed to load locale file (${locale}.json): ${response.status} ${response.statusText}`);
+          return {}; // Return empty object on fetch failure
+      }
+  } catch (error) {
+      console.error(`Error fetching locale file (${locale}.json):`, error);
+      return {}; // Return empty object on network or parsing error
+  }
+};
+
 
 // Function to get nested translation value
-const getNestedValue = (obj: Translations, key: string): string | undefined => {
-    const keys = key.split('.');
-    let current: string | NestedTranslations | undefined = obj;
+const getNestedValue = (obj: Translations | undefined, key: string): string | undefined => {
+   // Handle cases where obj might be undefined (e.g., locale file not loaded yet)
+   if (!obj) {
+       return undefined;
+   }
+  const keys = key.split('.');
+  let current: string | NestedTranslations | undefined = obj;
 
-    for (const k of keys) {
-        if (typeof current === 'object' && current !== null && k in current) {
-            current = current[k];
-        } else {
-            return undefined; // Key not found
-        }
+  for (const k of keys) {
+    if (typeof current === 'object' && current !== null && k in current) {
+      // Type assertion needed because TypeScript doesn't know the structure precisely
+      current = (current as NestedTranslations)[k];
+    } else {
+      return undefined; // Key not found
     }
+  }
 
-    return typeof current === 'string' ? current : undefined; // Return only if it's a string
+  // Check if the final value is a string before returning
+  return typeof current === 'string' ? current : undefined;
 };
+
 
 // Create the provider component
 export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
   // Use useLocalStorage to manage locale state persistence
-  const [locale, setLocale] = useLocalStorage<string>('locale', getDefaultLocale());
+  // Default to 'en' if localStorage is empty or invalid
+  const [locale, setLocale] = useLocalStorage<string>('locale', 'en');
   const [isClient, setIsClient] = useState(false);
+  const [translations, setTranslations] = useState<Record<string, Translations>>({});
+  const [isLoading, setIsLoading] = useState(true); // Add loading state
+
 
   // Track client-side hydration
   useEffect(() => {
       setIsClient(true);
-      // Re-evaluate default locale once client is available
-      const initialLocale = getDefaultLocale();
-      if (locale !== initialLocale) {
-          setLocale(initialLocale);
+  }, []);
+
+   // Load initial locale and translations on client mount
+  useEffect(() => {
+    if (isClient) {
+      const storedLocale = localStorage.getItem('locale');
+      const initialLocale = storedLocale && ['en', 'es'].includes(JSON.parse(storedLocale)) ? JSON.parse(storedLocale) : 'en';
+      // Set locale state without triggering localStorage write yet if it matches initial
+      setLocale(initialLocale);
+       // Load messages for the initial locale
+       loadMessages(initialLocale).then(loadedTranslations => {
+           setTranslations({ [initialLocale]: loadedTranslations });
+           setIsLoading(false); // Mark loading as complete
+       });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isClient]); // Run only once on client mount
+
+  // Load translations when locale changes (after initial load)
+  useEffect(() => {
+      if (isClient && !isLoading && !translations[locale]) { // Only load if not already loaded
+          setIsLoading(true); // Set loading true when changing locale
+          loadMessages(locale).then(loadedTranslations => {
+              setTranslations(prev => ({ ...prev, [locale]: loadedTranslations }));
+              setIsLoading(false);
+          });
       }
-  }, [locale, setLocale]); // Only update if locale differs from evaluated default
+  }, [locale, isClient, isLoading, translations]);
 
 
   const handleSetLocale = useCallback((newLocale: string) => {
@@ -97,42 +131,56 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
 
   // Translation function
   const t = useCallback((key: string, options?: Record<string, string | number>): string => {
-      // Use the state `locale` which is updated via useLocalStorage
-      const currentSelectedLocale = locale || 'en'; // Fallback if locale is somehow null
-      const currentTranslations = translations[currentSelectedLocale] || translations['en']; // Fallback to English
-      let translation = getNestedValue(currentTranslations, key);
+        // Use the state `locale` which is updated via useLocalStorage
+        const currentSelectedLocale = locale || 'en'; // Fallback if locale is somehow null
+        const currentTranslations = translations[currentSelectedLocale]; // Use loaded translations
 
-      if (translation === undefined) {
-        // Avoid excessive warnings for common keys like favicon during dev
-        if (key !== 'favicon.ico') {
-            console.warn(`Translation key "${key}" not found for locale "${currentSelectedLocale}"`);
+        // If translations haven't loaded for the current locale, return the key
+        if (!currentTranslations) {
+            // Avoid excessive warnings during initial load or locale change
+            if (!isLoading && key !== 'favicon.ico') {
+                console.warn(`Translations not loaded yet for locale "${currentSelectedLocale}", key: "${key}"`);
+            }
+            return key;
         }
-        translation = key; // Return the key if not found
-      }
 
-      // Handle interpolation
-      if (options && typeof translation === 'string') {
-        Object.keys(options).forEach(placeholder => {
-            const regex = new RegExp(`{{${placeholder}}}`, 'g');
-            translation = translation!.replace(regex, String(options[placeholder]));
-        });
-      }
+        let translation = getNestedValue(currentTranslations, key);
 
-      return translation || key; // Return key if translation somehow becomes null/undefined after interpolation
-  }, [locale]); // Depend only on the current state `locale`
+        if (translation === undefined) {
+            // Avoid excessive warnings for common keys like favicon during dev
+            if (key !== 'favicon.ico') {
+                 // Only warn if not loading
+                 if (!isLoading) {
+                     console.warn(`Translation key "${key}" not found for locale "${currentSelectedLocale}"`);
+                 }
+            }
+            translation = key; // Return the key if not found
+        }
+
+        // Handle interpolation
+        if (options && typeof translation === 'string') {
+            Object.keys(options).forEach(placeholder => {
+                const regex = new RegExp(`{{${placeholder}}}`, 'g');
+                translation = translation!.replace(regex, String(options[placeholder]));
+            });
+        }
+
+        return translation || key; // Return key if translation somehow becomes null/undefined after interpolation
+    }, [locale, translations, isLoading]);
 
 
-  const contextValue = {
+  const contextValue = useMemo(() => ({
     locale, // The actual current locale state
     setLocale: handleSetLocale, // Use the handler that updates localStorage
     t,
     currentLocale: locale, // Provide current locale directly
-  };
+  }), [locale, handleSetLocale, t]);
 
-  // Render children only when the client is hydrated to avoid mismatches
+
+  // Render children only when the client is hydrated and initial locale is loaded
   return (
     <LocaleContext.Provider value={contextValue}>
-      {isClient ? children : null /* Or a loading indicator */}
+      {(isClient && !isLoading) ? children : null /* Or a loading skeleton */}
     </LocaleContext.Provider>
   );
 };
