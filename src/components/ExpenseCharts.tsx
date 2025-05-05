@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     BarChart,
@@ -13,7 +12,7 @@ import {
 import { format, es } from 'date-fns';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatCurrency } from '@/lib/utils'; // Corrected import path
+import { formatCurrency } from '@/lib/dateUtils'; // Corrected import path
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Corrected import paths for chart components
@@ -266,6 +265,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                     }}
                                     // Hide the automatically generated total/label in items if we use labelFormatter
                                     // Filter out the internal 'total' key if it exists in the payload items
+                                    // Also filter out items with value 0 to avoid clutter
                                     filter={(item) => item.dataKey !== 'total' && item.dataKey !== '_rawDate' && Number(item.value) > 0}
                                     itemStyle={{ width: '100%' }} // Ensure items take full width
                                     indicator="dot"
@@ -329,3 +329,4 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
     </Card>
   );
 }
+
