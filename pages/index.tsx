@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx'; // Import xlsx library
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ProductHistory } from '@/components/ProductHistory';
+import { ExpenseCharts } from '@/components/ExpenseCharts'; // Import the new charts component
 // Toaster is now in _app.tsx
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
@@ -139,6 +140,8 @@ export default function Home() {
                onDeleteExpense={handleDeleteExpense}
                onDeleteProduct={handleDeleteProduct}
               />
+             {/* Add the new ExpenseCharts component here */}
+             <ExpenseCharts expenses={expenses} />
           </div>
          </div>
 
@@ -147,3 +150,4 @@ export default function Home() {
     </>
   );
 }
+

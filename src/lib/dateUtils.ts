@@ -1,4 +1,5 @@
 
+
 import {
   startOfWeek,
   endOfWeek,
@@ -15,7 +16,7 @@ import { es } from 'date-fns/locale'; // Import Spanish locale if needed
 import type { Expense } from '@/types/expense';
 
 // Helper to safely parse date strings or use Date objects
-const safelyParseDate = (date: Date | string | number): Date | null => {
+export const safelyParseDate = (date: Date | string | number): Date | null => {
   if (date instanceof Date && isValid(date)) {
     return date;
   }
@@ -110,7 +111,8 @@ export const parseCurrency = (formattedValue: string | number | null | undefined
     }
     // Convert to string if it's a number
     const stringValue = String(formattedValue);
-    // Remove non-digit characters (currency symbols, dots, commas)
+    // Remove non-digit characters (currency symbols, dots, commas) except for the decimal separator if needed
+    // For COP (no decimals), remove all non-digits.
     const numericString = stringValue.replace(/[^\d]/g, '');
     const number = parseInt(numericString, 10);
     return isNaN(number) ? 0 : number; // Return 0 if parsing fails or result is NaN
@@ -132,3 +134,4 @@ export const formatDate = (date: Date | string | number): string => {
         return validDate.toLocaleDateString() + ' ' + validDate.toLocaleTimeString();
     }
 }
+
