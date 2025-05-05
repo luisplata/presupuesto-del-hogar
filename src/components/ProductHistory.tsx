@@ -13,11 +13,13 @@ interface ProductHistoryProps {
   expenses: Expense[];
   onDeleteExpense: (id: string) => void;
   onDeleteProduct: (productName: string) => void; // Keep specific prop for clarity in Home
+  defaultCategoryKey: string; // Receive the key for the default category
 }
 
 // Helper to get unique products including 'all'
 const getUniqueProducts = (expenses: Expense[]): string[] => {
   const products = new Set(expenses.map(e => e.product));
+  // Ensure 'all' is first, then sort the rest
   return ['all', ...Array.from(products).sort()];
 };
 
@@ -29,10 +31,9 @@ const filterExpenses = (expenses: Expense[], selectedProduct: string): Expense[]
   return expenses.filter(expense => expense.product === selectedProduct);
 };
 
-export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct }: ProductHistoryProps) {
+export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct, defaultCategoryKey }: ProductHistoryProps) {
   const { t } = useLocale(); // Use the hook
   const [selectedProduct, setSelectedProduct] = useState<string>('all');
-  const defaultCategoryTranslated = t('category.undefined'); // Get translated default
 
   const uniqueProducts = useMemo(() => getUniqueProducts(expenses), [expenses]);
   const filteredExpenses = useMemo(() => filterExpenses(expenses, selectedProduct), [expenses, selectedProduct]);
@@ -57,7 +58,10 @@ export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct }: P
           <Label htmlFor="product-select">{t('history.selectProductLabel')}:</Label>
           <Select onValueChange={handleProductChange} value={selectedProduct}>
             <SelectTrigger id="product-select" className="w-full md:w-[280px] mt-1">
-              <SelectValue placeholder={t('history.selectProductPlaceholder')} />
+               {/* Display selected value */}
+              <SelectValue placeholder={t('history.selectProductPlaceholder')}>
+                {selectedProduct === 'all' ? t('history.allProductsOption') : selectedProduct}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {uniqueProducts.map(product => (
@@ -73,13 +77,13 @@ export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct }: P
         <ExpenseList
             expenses={filteredExpenses}
             onDeleteExpense={onDeleteExpense}
-            // Pass generic props only when a specific product is selected
             groupName={selectedProduct !== 'all' ? selectedProduct : undefined}
             onDeleteGroup={selectedProduct !== 'all' ? onDeleteProduct : undefined}
             groupTypeLabel={selectedProduct !== 'all' ? t('history.productTypeLabel') : undefined}
+            groupDisplayName={selectedProduct !== 'all' ? selectedProduct : undefined} // Product name is the display name
             title={title}
             caption={caption}
-            defaultCategory={defaultCategoryTranslated} // Pass translated default
+            defaultCategoryKey={defaultCategoryKey} // Pass key down
         />
       </CardContent>
     </Card>

@@ -14,15 +14,15 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, ChangeEvent } from 'react';
+import { useState, useEffect, ChangeEvent, useMemo } from 'react'; // Import useMemo
 import type { Expense } from '@/types/expense';
 import { formatCurrency, parseCurrency } from "@/lib/dateUtils";
 import { useLocale } from '@/hooks/useLocale'; // Import useLocale
 
 interface ExpenseFormProps {
   onAddExpense: (expense: Omit<Expense, 'id' | 'timestamp'>) => void;
-  categories: string[]; // Receive the list of available categories (excluding default)
-  defaultCategory: string; // Receive translated default category name
+  categories: string[]; // Receive the list of available categories (excluding default key)
+  defaultCategoryKey: string; // Receive the key for the default category
 }
 
 // Define Zod schema using a function to access translations
@@ -37,7 +37,7 @@ const createFormSchema = (t: (key: string) => string) => z.object({
 });
 
 
-export function ExpenseForm({ onAddExpense, categories, defaultCategory }: ExpenseFormProps) {
+export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: ExpenseFormProps) {
   const { t } = useLocale(); // Use the hook
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,6 +64,7 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategory }: Expen
     if (typeof priceValue === 'number' && !isNaN(priceValue)) {
       setFormattedPrice(formatCurrency(priceValue));
     } else {
+      // Default to formatting 0 if priceValue is not a valid number
       setFormattedPrice(formatCurrency(0));
     }
   }, [priceValue]);
@@ -72,29 +73,32 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategory }: Expen
   const handlePriceChange = (event: ChangeEvent<HTMLInputElement>, fieldOnChange: (value: number) => void) => {
     const rawValue = event.target.value;
     const numericValue = parseCurrency(rawValue);
+    // Use formatCurrency to update the display immediately
     setFormattedPrice(formatCurrency(isNaN(numericValue) ? 0 : numericValue));
+    // Update the numeric form state
     fieldOnChange(isNaN(numericValue) ? 0 : numericValue);
   };
 
    // Custom blur handler to ensure final formatting
    const handlePriceBlur = (fieldOnBlur: () => void, value: number) => {
+     // Re-format the current numeric value on blur
      setFormattedPrice(formatCurrency(isNaN(value) ? 0 : value));
-     fieldOnBlur();
+     fieldOnBlur(); // Trigger react-hook-form's blur handler
    };
 
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true);
     try {
-      // Use the passed defaultCategory if the input is empty or just whitespace
-      const categoryToSubmit = values.category?.trim() || defaultCategory;
+      // If the input is empty or just whitespace, use the defaultCategoryKey
+      const categoryToSubmit = values.category?.trim() || defaultCategoryKey;
 
       await new Promise(resolve => setTimeout(resolve, 100)); // Simulate delay
 
       onAddExpense({
         product: values.product,
         price: values.price,
-        category: categoryToSubmit, // Use the potentially defaulted category
+        category: categoryToSubmit, // Submit the key or the entered category
       });
 
       toast({
@@ -102,7 +106,8 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategory }: Expen
         description: t('form.toast.expenseAddedDescription', { // Translated description with interpolation
             product: values.product,
             price: formatCurrency(values.price),
-            category: categoryToSubmit
+            // Translate category for the toast message
+            category: categoryToSubmit === defaultCategoryKey ? t(defaultCategoryKey) : categoryToSubmit
         }),
       });
       form.reset({ product: "", price: 0, category: "" }); // Reset form with category empty
@@ -143,13 +148,13 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategory }: Expen
               <FormLabel>{t('form.priceLabel')}</FormLabel>
               <FormControl>
                 <Input
-                  type="text"
-                  placeholder="$0"
+                  type="text" // Use text to allow formatting characters
+                  placeholder={formatCurrency(0)} // Show formatted placeholder
                   {...field}
-                  value={formattedPrice}
+                  value={formattedPrice} // Bind to the formatted string state
                   onChange={(e) => handlePriceChange(e, field.onChange)}
                   onBlur={() => handlePriceBlur(field.onBlur, field.value)}
-                  inputMode="decimal"
+                  inputMode="decimal" // Hint for mobile keyboards
                 />
               </FormControl>
               <FormMessage />
@@ -171,7 +176,7 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategory }: Expen
                     autoComplete="off"
                  />
                   <datalist id="category-suggestions">
-                    {/* Map through provided categories (already filtered in parent) */}
+                    {/* Map through provided categories (keys/names already filtered in parent) */}
                     {categories.map(category => (
                         <option key={category} value={category} />
                     ))}

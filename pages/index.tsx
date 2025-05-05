@@ -20,14 +20,14 @@ import Head from 'next/head'; // Import Head for page-specific metadata
 import { useLocale } from '@/hooks/useLocale'; // Import the useLocale hook
 import { LanguageSelector } from '@/components/LanguageSelector'; // Import LanguageSelector
 
-const DEFAULT_CATEGORY_KEY = 'category.undefined'; // Key for translation
+const DEFAULT_CATEGORY_KEY = 'category.undefined'; // Key for the default category
 
 export default function Home() {
   const { t, currentLocale } = useLocale(); // Use the hook
-  const defaultCategoryTranslated = t(DEFAULT_CATEGORY_KEY);
 
+  // Store the key 'category.undefined' in categories list
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
-  const [categories, setCategories] = useLocalStorage<string[]>('categories', [defaultCategoryTranslated]);
+  const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY_KEY]);
 
   // Client-side state to prevent hydration mismatch for export button
   const [isClient, setIsClient] = useState(false);
@@ -35,52 +35,27 @@ export default function Home() {
     setIsClient(true);
   }, []);
 
-  // Update default category in storage if locale changes and default is present
+  // Ensure the default category key always exists in the list
   useEffect(() => {
-    const currentDefaultKey = 'category.undefined'; // Hardcoded key
-    const newDefaultTranslated = t(currentDefaultKey);
-
-    // Check if the old default (potentially from another language) exists
-    const oldDefaultExists = categories.some(cat => cat !== newDefaultTranslated && Object.values(require(`@/locales/en.json`))[currentDefaultKey] === cat || Object.values(require(`@/locales/es.json`))[currentDefaultKey] === cat );
-
-
-    if (oldDefaultExists) {
-        // Filter out the old default and add the new translated one
-        const updatedCategories = categories.filter(cat => cat !== Object.values(require(`@/locales/en.json`))[currentDefaultKey] && cat !== Object.values(require(`@/locales/es.json`))[currentDefaultKey]);
-        if (!updatedCategories.includes(newDefaultTranslated)) {
-            updatedCategories.push(newDefaultTranslated);
-        }
-        setCategories(updatedCategories.sort());
-
-         // Also update existing expenses using the old default category name
-         setExpenses(prevExpenses => prevExpenses.map(exp => {
-            const oldEnDefault = require(`@/locales/en.json`)[currentDefaultKey];
-            const oldEsDefault = require(`@/locales/es.json`)[currentDefaultKey];
-             if (exp.category === oldEnDefault || exp.category === oldEsDefault) {
-                 return { ...exp, category: newDefaultTranslated };
-             }
-             return exp;
-         }));
-    } else if (!categories.includes(newDefaultTranslated)) {
-        // If the old default wasn't found but the new one isn't there either, add it.
-        setCategories(prev => [...prev, newDefaultTranslated].sort());
+    if (!categories.includes(DEFAULT_CATEGORY_KEY)) {
+      setCategories(prev => [...prev, DEFAULT_CATEGORY_KEY].sort());
     }
-
-  }, [currentLocale, t, categories, setCategories, setExpenses]); // Depend on locale and translation function
+  }, [categories, setCategories]);
 
 
   const handleAddExpense = (newExpenseData: Omit<Expense, 'id' | 'timestamp'>) => {
-     const categoryToAdd = (newExpenseData.category?.trim() || defaultCategoryTranslated); // Default if empty/whitespace
+     // If category input is empty or whitespace, use the default key
+     const categoryToAdd = newExpenseData.category?.trim() ? newExpenseData.category.trim() : DEFAULT_CATEGORY_KEY;
 
      const newExpense: Expense = {
       ...newExpenseData,
-      category: categoryToAdd, // Ensure category is set
+      category: categoryToAdd, // Store the key or the entered category
       id: uuidv4(),
       timestamp: new Date(), // Store as Date object
     };
 
-    // Add new category to the list if it doesn't exist
-    if (!categories.includes(categoryToAdd)) {
+    // Add new category to the list if it's not the default and doesn't exist
+    if (categoryToAdd !== DEFAULT_CATEGORY_KEY && !categories.includes(categoryToAdd)) {
       setCategories(prevCategories => [...prevCategories, categoryToAdd].sort());
     }
 
@@ -100,10 +75,13 @@ export default function Home() {
      setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product !== productNameToDelete));
    };
 
-   // Handler to delete all expenses for a specific category
-   const handleDeleteCategory = (categoryNameToDelete: string) => {
-        // Also handle the case where the category might be the default one
-       setExpenses(prevExpenses => prevExpenses.filter(expense => (expense.category || defaultCategoryTranslated) !== categoryNameToDelete));
+   // Handler to delete all expenses for a specific category (using the key or name)
+   const handleDeleteCategory = (categoryIdentifierToDelete: string) => {
+       setExpenses(prevExpenses => prevExpenses.filter(expense => expense.category !== categoryIdentifierToDelete));
+        // Optional: Remove the category from the list if it's not the default one
+       if (categoryIdentifierToDelete !== DEFAULT_CATEGORY_KEY && categories.includes(categoryIdentifierToDelete)) {
+           setCategories(prev => prev.filter(cat => cat !== categoryIdentifierToDelete));
+       }
    };
 
 
@@ -121,7 +99,8 @@ export default function Home() {
        .map(exp => ({
           [t('excel.product')]: exp.product,
           [t('excel.price')]: exp.price, // Keep as number for Excel calculations
-          [t('excel.category')]: exp.category || defaultCategoryTranslated, // Add category column, default if undefined
+          // Translate the category only for the export
+          [t('excel.category')]: exp.category === DEFAULT_CATEGORY_KEY ? t(DEFAULT_CATEGORY_KEY) : exp.category,
           [t('excel.datetime')]: formatDate(exp.timestamp, currentLocale), // Format date for readability, pass locale
        }));
 
@@ -180,8 +159,9 @@ export default function Home() {
           <div className="md:col-span-1">
              <ExpenseForm
                  onAddExpense={handleAddExpense}
-                 categories={categories.filter(cat => cat !== defaultCategoryTranslated)} // Exclude default from suggestions
-                 defaultCategory={defaultCategoryTranslated} // Pass translated default explicitly
+                 // Pass categories excluding the default key
+                 categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)}
+                 defaultCategoryKey={DEFAULT_CATEGORY_KEY} // Pass key instead of translated string
              />
           </div>
 
@@ -192,13 +172,14 @@ export default function Home() {
                expenses={expenses}
                onDeleteExpense={handleDeleteExpense}
                onDeleteProduct={handleDeleteProduct} // Specific handler passed
+               defaultCategoryKey={DEFAULT_CATEGORY_KEY} // Pass key
               />
              {/* Category History */}
              <CategoryHistory
                expenses={expenses}
                onDeleteExpense={handleDeleteExpense}
                onDeleteCategory={handleDeleteCategory} // New handler passed
-               defaultCategory={defaultCategoryTranslated} // Pass translated default
+               defaultCategoryKey={DEFAULT_CATEGORY_KEY} // Pass key
              />
              {/* Expense Charts */}
              <ExpenseCharts expenses={expenses} />

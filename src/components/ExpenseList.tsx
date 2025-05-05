@@ -38,10 +38,11 @@ interface ExpenseListProps {
   caption?: string;
   onDeleteExpense: (id: string) => void;
   // Generic group deletion props
-  groupName?: string;         // Name of the current group (product or category) being viewed
-  onDeleteGroup?: (name: string) => void; // Handler to delete all expenses for the group
-  groupTypeLabel?: string;   // Label for the group type (e.g., "Producto", "Categoría") - Will be translated
-  defaultCategory: string; // Pass translated default category
+  groupName?: string;         // Identifier (key or name) of the current group
+  groupDisplayName?: string;  // Translated/display name of the group for UI
+  onDeleteGroup?: (identifier: string) => void; // Handler uses the identifier
+  groupTypeLabel?: string;   // Translated label for the group type (e.g., "Producto", "Categoría")
+  defaultCategoryKey: string; // Receive the key for the default category
 }
 
 export function ExpenseList({
@@ -49,10 +50,11 @@ export function ExpenseList({
   title: propTitle, // Rename prop to avoid conflict
   caption: propCaption, // Rename prop
   onDeleteExpense,
-  groupName, // Use generic prop
+  groupName, // Use generic identifier prop
+  groupDisplayName, // Use display name prop for UI
   onDeleteGroup, // Use generic prop
   groupTypeLabel, // Use generic prop (already translated if coming from parent)
-  defaultCategory // Use translated default
+  defaultCategoryKey // Use key
 }: ExpenseListProps) {
   const { t, currentLocale } = useLocale(); // Use the hook
   const { toast } = useToast();
@@ -70,14 +72,15 @@ export function ExpenseList({
      });
   };
 
-  // Renamed handler for clarity
-  const handleDeleteGroupClick = (name: string) => {
+  // Renamed handler for clarity - uses the group identifier (key or name)
+  const handleDeleteGroupClick = (identifier: string) => {
     if (onDeleteGroup) {
-      onDeleteGroup(name);
+      onDeleteGroup(identifier);
       toast({
         // Use the already translated groupTypeLabel passed from parent
         title: t('list.toast.groupDeletedTitle', { groupType: groupTypeLabel || t('list.defaultGroupType') }),
-        description: t('list.toast.groupDeletedDescription', { name }),
+        // Use the groupDisplayName for the toast description
+        description: t('list.toast.groupDeletedDescription', { name: groupDisplayName || identifier }),
       });
     }
   };
@@ -96,8 +99,7 @@ export function ExpenseList({
     )
   }
 
-  // Determine if we are showing a list filtered by a single group (product or category)
-  // Check if onDeleteGroup is provided, which implies a filtered view that might allow deletion
+  // Determine if we are showing a list filtered by a single group
   const isSingleGroupView = !!onDeleteGroup && !!groupName;
 
 
@@ -106,26 +108,26 @@ export function ExpenseList({
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{title}</CardTitle>
         {/* Show Delete Group Button only if it's a single group view */}
-        {isSingleGroupView && (
+        {isSingleGroupView && groupName && ( // Ensure groupName exists
              <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    {/* Use groupTypeLabel and groupName in the button text */}
+                    {/* Use groupTypeLabel and groupDisplayName in the button text */}
                     <Button variant="destructive" size="sm">
-                        <Trash2 className="mr-2 h-4 w-4" /> {t('list.deleteGroupButton', { groupType: groupTypeLabel, groupName })}
+                        <Trash2 className="mr-2 h-4 w-4" /> {t('list.deleteGroupButton', { groupType: groupTypeLabel, groupName: groupDisplayName || groupName })}
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                     <AlertDialogTitle>{t('list.deleteConfirmTitle')}</AlertDialogTitle>
-                    {/* Use groupTypeLabel and groupName in the dialog description */}
+                    {/* Use groupTypeLabel and groupDisplayName in the dialog description */}
                     <AlertDialogDescription>
-                        {t('list.deleteConfirmDescription', { groupType: groupTypeLabel?.toLowerCase() || t('list.defaultGroupType').toLowerCase(), groupName })}
+                        {t('list.deleteConfirmDescription', { groupType: groupTypeLabel?.toLowerCase() || t('list.defaultGroupType').toLowerCase(), groupName: groupDisplayName || groupName })}
                     </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                     <AlertDialogCancel>{t('list.cancelButton')}</AlertDialogCancel>
                     {/* Use groupTypeLabel in the action button */}
-                    <AlertDialogAction onClick={() => handleDeleteGroupClick(groupName!)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    <AlertDialogAction onClick={() => handleDeleteGroupClick(groupName)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                          {t('list.deleteButton', { groupType: groupTypeLabel })}
                     </AlertDialogAction>
                     </AlertDialogFooter>
@@ -157,9 +159,9 @@ export function ExpenseList({
                   <TableCell className="font-medium">{expense.product}</TableCell>
                   <TableCell>{formatCurrency(expense.price)}</TableCell>
                   <TableCell>
-                      {/* Use defaultCategory for comparison */}
-                      <Badge variant={expense.category === defaultCategory ? 'secondary' : 'outline'}>
-                          {expense.category || defaultCategory}
+                      {/* Translate category name for display, use key for comparison */}
+                      <Badge variant={expense.category === defaultCategoryKey ? 'secondary' : 'outline'}>
+                          {expense.category === defaultCategoryKey ? t(defaultCategoryKey) : expense.category}
                       </Badge>
                   </TableCell>
                   <TableCell>{formatDate(expense.timestamp, currentLocale)}</TableCell> {/* Pass locale */}

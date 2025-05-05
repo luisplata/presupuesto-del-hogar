@@ -12,41 +12,45 @@ import { useLocale } from '@/hooks/useLocale'; // Import useLocale
 interface CategoryHistoryProps {
   expenses: Expense[];
   onDeleteExpense: (id: string) => void;
-  onDeleteCategory: (categoryName: string) => void; // Handler to delete all expenses for a category
-  defaultCategory: string; // Receive translated default category name
+  onDeleteCategory: (categoryIdentifier: string) => void; // Handler accepts the key or name
+  defaultCategoryKey: string; // Receive the key for the default category
 }
 
-// Helper to get unique categories including 'all' and handling undefined/default
-const getUniqueCategories = (expenses: Expense[], defaultCategory: string): string[] => {
-  const categories = new Set(expenses.map(e => e.category || defaultCategory));
-  // Ensure 'all' is first, then sort the rest
-  return ['all', ...Array.from(categories).sort()];
+// Helper to get unique category identifiers (keys or names) including 'all'
+const getUniqueCategoryIdentifiers = (expenses: Expense[], defaultCategoryKey: string): string[] => {
+  const identifiers = new Set(expenses.map(e => e.category || defaultCategoryKey));
+  // Ensure 'all' is first, then sort the rest (keys and names mixed)
+  return ['all', ...Array.from(identifiers).sort()];
 };
 
-// Helper to filter expenses based on the selected category
-const filterExpensesByCategory = (expenses: Expense[], selectedCategory: string, defaultCategory: string): Expense[] => {
-  if (selectedCategory === 'all') {
+// Helper to filter expenses based on the selected category identifier
+const filterExpensesByCategory = (expenses: Expense[], selectedIdentifier: string, defaultCategoryKey: string): Expense[] => {
+  if (selectedIdentifier === 'all') {
     return expenses;
   }
-  // Handle the default category case during filtering
-  return expenses.filter(expense => (expense.category || defaultCategory) === selectedCategory);
+  // Handle the default category key case during filtering
+  return expenses.filter(expense => (expense.category || defaultCategoryKey) === selectedIdentifier);
 };
 
-export function CategoryHistory({ expenses, onDeleteExpense, onDeleteCategory, defaultCategory }: CategoryHistoryProps) {
+export function CategoryHistory({ expenses, onDeleteExpense, onDeleteCategory, defaultCategoryKey }: CategoryHistoryProps) {
   const { t } = useLocale(); // Use the hook
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategoryIdentifier, setSelectedCategoryIdentifier] = useState<string>('all'); // State holds the key or name
 
-  const uniqueCategories = useMemo(() => getUniqueCategories(expenses, defaultCategory), [expenses, defaultCategory]);
-  const filteredExpenses = useMemo(() => filterExpensesByCategory(expenses, selectedCategory, defaultCategory), [expenses, selectedCategory, defaultCategory]);
+  const uniqueCategoryIdentifiers = useMemo(() => getUniqueCategoryIdentifiers(expenses, defaultCategoryKey), [expenses, defaultCategoryKey]);
+  const filteredExpenses = useMemo(() => filterExpensesByCategory(expenses, selectedCategoryIdentifier, defaultCategoryKey), [expenses, selectedCategoryIdentifier, defaultCategoryKey]);
 
   const handleCategoryChange = useCallback((value: string | undefined) => {
      if (value !== undefined) {
-        setSelectedCategory(value);
+        setSelectedCategoryIdentifier(value);
      }
   }, []);
 
-  const title = selectedCategory === 'all' ? t('history.allCategories') : `${t('history.categoryHistoryPrefix')} ${selectedCategory}`;
-  const caption = selectedCategory === 'all' ? t('history.allExpensesCaption') : `${t('history.categoryExpensesCaptionPrefix')} ${selectedCategory}.`;
+  // Translate the selected identifier for display purposes
+  const translatedSelectedCategory = selectedCategoryIdentifier === 'all' ? t('history.allCategoriesOption') :
+                                      selectedCategoryIdentifier === defaultCategoryKey ? t(defaultCategoryKey) : selectedCategoryIdentifier;
+
+  const title = selectedCategoryIdentifier === 'all' ? t('history.allCategories') : `${t('history.categoryHistoryPrefix')} ${translatedSelectedCategory}`;
+  const caption = selectedCategoryIdentifier === 'all' ? t('history.allExpensesCaption') : `${t('history.categoryExpensesCaptionPrefix')} ${translatedSelectedCategory}.`;
 
 
   return (
@@ -57,31 +61,37 @@ export function CategoryHistory({ expenses, onDeleteExpense, onDeleteCategory, d
       <CardContent className="space-y-4">
         <div>
           <Label htmlFor="category-select">{t('history.selectCategoryLabel')}:</Label>
-          <Select onValueChange={handleCategoryChange} value={selectedCategory}>
+          <Select onValueChange={handleCategoryChange} value={selectedCategoryIdentifier}>
             <SelectTrigger id="category-select" className="w-full md:w-[280px] mt-1">
-              <SelectValue placeholder={t('history.selectCategoryPlaceholder')} />
+              {/* Display translated value */}
+              <SelectValue placeholder={t('history.selectCategoryPlaceholder')}>
+                  {translatedSelectedCategory}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {uniqueCategories.map(category => (
-                <SelectItem key={category} value={category}>
-                  {category === 'all' ? t('history.allCategoriesOption') : category}
+              {uniqueCategoryIdentifiers.map(identifier => (
+                <SelectItem key={identifier} value={identifier}>
+                  {/* Translate display text */}
+                  {identifier === 'all' ? t('history.allCategoriesOption') :
+                   identifier === defaultCategoryKey ? t(defaultCategoryKey) : identifier}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Use the generic group deletion props for ExpenseList */}
+        {/* Pass down the selected identifier (key or name) and the translated type label */}
         <ExpenseList
             expenses={filteredExpenses}
             onDeleteExpense={onDeleteExpense}
-            // Pass generic props only when a specific category is selected
-            groupName={selectedCategory !== 'all' ? selectedCategory : undefined}
-            onDeleteGroup={selectedCategory !== 'all' ? onDeleteCategory : undefined}
-            groupTypeLabel={selectedCategory !== 'all' ? t('history.categoryTypeLabel') : undefined}
+            groupName={selectedCategoryIdentifier !== 'all' ? selectedCategoryIdentifier : undefined} // Pass the identifier
+            onDeleteGroup={selectedCategoryIdentifier !== 'all' ? onDeleteCategory : undefined}
+            // Translate the group type label and the name for the delete button/dialog
+            groupTypeLabel={selectedCategoryIdentifier !== 'all' ? t('history.categoryTypeLabel') : undefined}
+            groupDisplayName={translatedSelectedCategory} // Pass translated name for UI display in ExpenseList
             title={title}
             caption={caption}
-            defaultCategory={defaultCategory} // Pass default category down
+            defaultCategoryKey={defaultCategoryKey} // Pass default category key down
         />
       </CardContent>
     </Card>
