@@ -9,7 +9,8 @@ import {
     CartesianGrid,
     ResponsiveContainer,
 } from 'recharts';
-import { format as formatDateFns, es } from 'date-fns';
+import { format as formatDateFns } from 'date-fns';
+import { es } from 'date-fns/locale'; // Import 'es' locale directly
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency } from '@/lib/dateUtils'; // Corrected import path
