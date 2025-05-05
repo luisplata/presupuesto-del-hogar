@@ -28,7 +28,7 @@ interface DailyProductExpense {
     date: string;         // Display date
     _rawDate: string;      // Internal date key
     total: number;        // Total expense for the day
-    [productKey: string]: number | string; // Dynamic properties for each product's expense
+    [key: string]: number | string; // Dynamic properties for each product's expense
 }
 
 // Define the type for the data returned by the aggregation function
@@ -56,16 +56,19 @@ const aggregateStackedExpensesByDay = (
   const cutoffDate = new Date(today);
   cutoffDate.setDate(today.getDate() - days + 1); // Include the cutoff day itself
   cutoffDate.setHours(0, 0, 0, 0); // Start of the cutoff day
-
-  const dailyTotals: {
-    [date: string]: {
+  
+  interface DailyTotalsType {
+    [date: string]: { // index signature
       total: number;
       products: { [productKey: string]: number };
     };
-  } = {};
-  const productKeysMap: { [key: string]: string } = {}; // Store original product names
+  }
+
+  const dailyTotals: DailyTotalsType = {};
+  const productKeysMap: { [key: string]: string } = {};
   const allDates = new Set<string>();
   const dateFnsLocale = es; // Default to Spanish locale
+
 
   // Initialize daily totals for all dates within the range
   let currentDate = new Date(cutoffDate);
@@ -122,7 +125,9 @@ const aggregateStackedExpensesByDay = (
 
   // Ensure all product keys exist in every data point (with value 0 if absent)
   const finalData = aggregatedData.map(dayData => {
-    const completeDayData = { ...dayData };
+    const completeDayData:DailyProductExpense = { ...dayData };
+
+
     Object.keys(productKeysMap).forEach(productKey => {
       if (!(productKey in completeDayData)) {
         completeDayData[productKey] = 0;
@@ -239,20 +244,21 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                     // Use nameKey to correctly map data keys to config labels
                                     nameKey="name" // Ensure this maps to the product key in config
                                     // Format each item in the tooltip (product: price)
-                                    formatter={(value, name, item) => {
-                                        // 'name' is the product key from the config
-                                        // 'item.name' is the original data key (product name) used in <Bar>
-                                        const originalName = item.name; // Get original name from Bar's name prop
-                                        return (
-                                            <div className="flex justify-between items-center w-full">
-                                                {/* Use item.color for the dot indicator */}
-                                                <span className="flex items-center mr-2">
-                                                    <span
-                                                        className="w-2.5 h-2.5 rounded-full mr-1.5"
-                                                        style={{ backgroundColor: item.color }}
-                                                     />
-                                                    {originalName}:
-                                                </span>
+                                     formatter={(value, name, item) => {
+                                      // Filter out internal keys and items with value 0
+                                      if (item.dataKey === 'total' || item.dataKey === '_rawDate' || Number(item.value) <= 0) {
+                                          return null;
+                                      }
+                                      // 'name' is the product key from the config
+                                      // 'item.name' is the original data key (product name) used in <Bar>
+                                      const originalName = item.name; // Get original name from Bar's name prop
+                                      return (
+                                          <div className="flex justify-between items-center w-full">
+                                              {/* Use item.color for the dot indicator */}
+                                              <span className="flex items-center mr-2">
+                                                  <span className="w-2.5 h-2.5 rounded-full mr-1.5" style={{ backgroundColor: item.color }} />
+                                                  {originalName}:
+                                              </span>
                                                 <span className="ml-2 font-semibold">{formatCurrency(value as number)}</span>
                                             </div>
                                         );
@@ -269,12 +275,6 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                             </>
                                         );
                                     }}
-                                    // Filter out internal keys and items with value 0
-                                    filter={(item) => item.dataKey !== 'total' && item.dataKey !== '_rawDate' && Number(item.value) > 0}
-                                    itemStyle={{ width: '100%' }} // Ensure items take full width
-                                    indicator="dot" // Use dot indicator within formatter now
-                                    hideIndicator={true} // Hide default indicator as we format it ourselves
-                                    labelClassName="font-semibold"
                                     className="min-w-[150px]" // Adjust tooltip width if needed
                                 />
                             }
@@ -298,7 +298,6 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                      stroke={`var(--color-${productKey})`} // Use product color for line
                                      strokeWidth={2}
                                      dot={false} // Hide dots on the line itself, tooltip shows info
-                                     stackId="a" // Associate with the same stack (important for correct line position)
                                      name={productKeysMap[productKey]} // Name for tooltip
                                  />
                             </React.Fragment>
