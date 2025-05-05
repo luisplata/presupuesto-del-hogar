@@ -129,17 +129,22 @@ const aggregateStackedExpensesByDay = (
   return { data: finalData, productKeys: productKeysMap };
 };
 
-// Function to generate chart config dynamically based on products
+// Function to generate chart config dynamically with random colors
 const generateChartConfig = (productKeysMap: { [key: string]: string }): ChartConfig => {
     const config: ChartConfig = {};
     const productKeys = Object.keys(productKeysMap);
-    const numColors = 5; // Number of predefined chart colors (--chart-1 to --chart-5)
 
-    productKeys.forEach((key, index) => {
-        const colorVar = `hsl(var(--chart-${(index % numColors) + 1}))`; // Cycle through chart colors
+    productKeys.forEach((key) => {
+        // Generate random HSL values for better visual distinction
+        const hue = Math.floor(Math.random() * 360);
+        // Keep saturation and lightness in ranges that provide decent visibility
+        const saturation = Math.floor(Math.random() * 31) + 60; // 60-90%
+        const lightness = Math.floor(Math.random() * 31) + 40; // 40-70%
+        const randomColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+
         config[key] = {
             label: productKeysMap[key], // Use original product name for label
-            color: colorVar,
+            color: randomColor,         // Assign the generated random color
         };
     });
 
@@ -177,9 +182,9 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
     }, [expenses]); // Recalculate when expenses change
 
     const renderChart = (data: DailyProductExpense[], productKeysMap: { [key: string]: string }, period: string) => {
-        const productKeys = Object.keys(productKeysMap);
-        // Memoize chartConfig generation
+        // Memoize chartConfig generation. Colors will be random but stable unless productKeysMap changes.
         const chartConfig = useMemo(() => generateChartConfig(productKeysMap), [productKeysMap]);
+        const productKeys = Object.keys(productKeysMap); // Get keys after config generation
 
 
         if (!isClient) {
