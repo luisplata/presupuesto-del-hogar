@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    BarChart,
-    Bar,
+    LineChart, // Changed from BarChart
+    Line,      // Added Line
+    Area,      // Added Area
     XAxis,
     YAxis,
     CartesianGrid,
-    // Tooltip, // Using ChartTooltip from shadcn
-    // Legend, // Removed Legend
     ResponsiveContainer,
 } from 'recharts';
 import { format, es } from 'date-fns';
@@ -210,8 +209,8 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
         return (
             <ChartContainer config={chartConfig} className="min-h-[350px] w-full mt-4">
                 <ResponsiveContainer width="100%" height={350}>
-                    {/* Removed Legend props from BarChart */}
-                    <BarChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}> {/* Reduced bottom margin as legend is removed */}
+                    {/* Changed BarChart to LineChart */}
+                    <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
                         <XAxis
                             dataKey="date"
@@ -226,9 +225,8 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                             tickMargin={8}
                             width={80} // Adjust width for currency formatting
                         />
-                         {/* Updated Tooltip still shows product breakdown on hover */}
                          <ChartTooltip
-                            cursor={false}
+                            cursor={true} // Show cursor line on hover for line chart
                             content={
                                 <ChartTooltipContent
                                     // Use nameKey to correctly map data keys to config labels
@@ -274,19 +272,31 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                 />
                             }
                          />
-                         {/* ChartLegend component removed */}
 
+                        {/* Changed Bar to Line and Area components */}
                         {productKeys.map((productKey) => (
-                            <Bar
-                                key={productKey}
-                                dataKey={productKey}
-                                stackId="a" // All product bars belong to the same stack
-                                fill={`var(--color-${productKey})`} // Use color from generated config
-                                radius={[4, 4, 0, 0]} // Apply radius to the top of the bars
-                                name={productKeysMap[productKey]} // Use original product name for tooltip mapping
-                            />
+                             <React.Fragment key={productKey}>
+                                <Area // Area component for stacking
+                                    type="monotone"
+                                    dataKey={productKey}
+                                    stackId="a" // Stack areas together
+                                    stroke="none" // Area doesn't need a visible stroke itself
+                                    fill={`var(--color-${productKey})`} // Fill with product color
+                                    fillOpacity={0.6} // Make fill slightly transparent
+                                    name={productKeysMap[productKey]} // Name for tooltip
+                                 />
+                                <Line // Line component for the visual line edge
+                                     type="monotone"
+                                     dataKey={productKey}
+                                     stroke={`var(--color-${productKey})`} // Use product color for line
+                                     strokeWidth={2}
+                                     dot={false} // Hide dots on the line itself, tooltip shows info
+                                     stackId="a" // Associate with the same stack (important for correct line position)
+                                     name={productKeysMap[productKey]} // Name for tooltip
+                                 />
+                            </React.Fragment>
                         ))}
-                    </BarChart>
+                    </LineChart>
                 </ResponsiveContainer>
             </ChartContainer>
         );
@@ -296,7 +306,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Análisis de Gastos por Día y Producto</CardTitle>
+        <CardTitle>Análisis de Gastos por Día y Producto (Gráfico de Área Apilada)</CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="7days" className="w-full">
