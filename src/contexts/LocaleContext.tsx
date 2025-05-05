@@ -1,7 +1,6 @@
 
 // src/contexts/LocaleContext.tsx
 import React, { createContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-
 import useLocalStorage from '@/hooks/useLocalStorage'; // Import useLocalStorage
 
 // Define the structure of your translations
@@ -33,15 +32,25 @@ interface LocaleProviderProps {
 }
 
 const loadMessages = async (locale: string): Promise<Translations> => {
-  console.log('loadMessages called with locale:', locale);
+  // Prevent server-side execution
+  if (typeof window === 'undefined') {
+    console.warn("Attempted to load messages on the server.");
+    return {};
+  }
+  console.log(`Loading messages for locale: ${locale}`);
   try {
       // Construct the correct path relative to the public directory
-      const response = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/locales/${locale}.json`);
+      // Ensure NEXT_PUBLIC_BASE_PATH is defined in your env or default to ''
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
+      const path = `${basePath}/locales/${locale}.json`;
+      console.log(`Fetching from path: ${path}`);
+      const response = await fetch(path);
       if (response.ok) {
           const loadedTranslations = await response.json();
+          console.log(`Successfully loaded translations for ${locale}`);
           return loadedTranslations; // Return the fetched JSON
       } else {
-          console.error(`Failed to load locale file (${locale}.json): ${response.status} ${response.statusText}`);
+          console.error(`Failed to load locale file (${locale}.json) from ${path}: ${response.status} ${response.statusText}`);
           return {}; // Return empty object on fetch failure
       }
   } catch (error) {
@@ -76,57 +85,60 @@ const getNestedValue = (obj: Translations | undefined, key: string): string | un
 
 // Create the provider component
 export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
-  // Use useLocalStorage to manage locale state persistence
-  // Default to 'en' if localStorage is empty or invalid
   const [locale, setLocale] = useLocalStorage<string>('locale', 'en');
   const [isClient, setIsClient] = useState(false);
   const [translations, setTranslations] = useState<Record<string, Translations>>({});
-  const [isLoading, setIsLoading] = useState(true); // Add loading state
-
 
   // Track client-side hydration
   useEffect(() => {
       setIsClient(true);
-  }, []);
+       // Determine initial locale on client mount
+       const storedLocale = localStorage.getItem('locale');
+       let initialLocale = 'en'; // Default
+       if (storedLocale) {
+           try {
+               const parsedLocale = JSON.parse(storedLocale);
+               if (['en', 'es'].includes(parsedLocale)) {
+                   initialLocale = parsedLocale;
+               }
+           } catch (e) {
+               console.error("Error parsing stored locale", e);
+               // Use default 'en' if parsing fails
+           }
+       }
+        // Important: Set the locale state *after* confirming client-side
+        // This avoids potential mismatches if useLocalStorage initializes differently server-side
+        setLocale(initialLocale);
+  }, [setLocale]); // Add setLocale as dependency
 
-   // Load initial locale and translations on client mount
+  // Load translations when locale changes or on initial client mount
   useEffect(() => {
-    if (isClient) {
-      const storedLocale = localStorage.getItem('locale');
-      const initialLocale = storedLocale && ['en', 'es'].includes(JSON.parse(storedLocale)) ? JSON.parse(storedLocale) : 'en';
-      // Set locale state without triggering localStorage write yet if it matches initial
-      setLocale(initialLocale);
-       // Load messages for the initial locale
-       loadMessages(initialLocale).then(loadedTranslations => {
-           setTranslations({ [initialLocale]: loadedTranslations });
-           setIsLoading(false); // Mark loading as complete
-       });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isClient]); // Run only once on client mount
-
-  // Load translations when locale changes (after initial load)
-  useEffect(() => {
-      if (isClient && !isLoading && !translations[locale]) { // Only load if not already loaded
-          setIsLoading(true); // Set loading true when changing locale
+    if (isClient && locale) { // Ensure locale is set
+      // Check if translations for the current locale are already loaded
+      if (!translations[locale]) {
+          console.log(`Translations for "${locale}" not found, loading...`);
           loadMessages(locale).then(loadedTranslations => {
-              setTranslations(prev => ({ ...prev, [locale]: loadedTranslations }));
-              setIsLoading(false);
+              // Check if translations were successfully loaded
+              if (Object.keys(loadedTranslations).length > 0) {
+                 setTranslations(prev => ({ ...prev, [locale]: loadedTranslations }));
+              } else {
+                 console.warn(`Loaded empty translations for locale "${locale}". Check file path and content.`);
+              }
           });
+      } else {
+          console.log(`Translations for "${locale}" already loaded.`);
       }
-  }, [locale, isClient, isLoading, translations]);
+    }
+  }, [locale, isClient, translations]); // Depend on translations to avoid re-fetching if already loaded
 
 
   const handleSetLocale = useCallback((newLocale: string) => {
-     // Check if the new locale is valid and different from the current one
-    if (['en', 'es'].includes(newLocale) && newLocale !== locale) {
+    if (['en', 'es'].includes(newLocale)) {
         setLocale(newLocale); // Update state and localStorage via useLocalStorage hook
-    } else if (newLocale === locale) {
-        // console.log(`Locale ${newLocale} is already set.`);
     } else {
         console.warn(`Locale "${newLocale}" is not supported.`);
     }
-  }, [locale, setLocale]);
+  }, [setLocale]);
 
 
   // Translation function
@@ -136,10 +148,10 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
         const currentTranslations = translations[currentSelectedLocale]; // Use loaded translations
 
         // If translations haven't loaded for the current locale, return the key
-        if (!currentTranslations) {
-            // Avoid excessive warnings during initial load or locale change
-            if (!isLoading && key !== 'favicon.ico') {
-                console.warn(`Translations not loaded yet for locale "${currentSelectedLocale}", key: "${key}"`);
+        if (!isClient || !currentTranslations) {
+            // Log only if client-side and not a common ignored key
+            if (isClient && key !== 'favicon.ico') {
+                 console.warn(`Translations not available yet for locale "${currentSelectedLocale}", key: "${key}"`);
             }
             return key;
         }
@@ -147,12 +159,8 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
         let translation = getNestedValue(currentTranslations, key);
 
         if (translation === undefined) {
-            // Avoid excessive warnings for common keys like favicon during dev
             if (key !== 'favicon.ico') {
-                 // Only warn if not loading
-                 if (!isLoading) {
-                     console.warn(`Translation key "${key}" not found for locale "${currentSelectedLocale}"`);
-                 }
+                 console.warn(`Translation key "${key}" not found for locale "${currentSelectedLocale}"`);
             }
             translation = key; // Return the key if not found
         }
@@ -166,7 +174,7 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
         }
 
         return translation || key; // Return key if translation somehow becomes null/undefined after interpolation
-    }, [locale, translations, isLoading]);
+    }, [locale, translations, isClient]); // Add isClient dependency
 
 
   const contextValue = useMemo(() => ({
@@ -176,11 +184,20 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
     currentLocale: locale, // Provide current locale directly
   }), [locale, handleSetLocale, t]);
 
+  // Render children only when the client is hydrated AND translations for the current locale are loaded
+  const translationsLoaded = isClient && !!translations[locale];
 
-  // Render children only when the client is hydrated and initial locale is loaded
+  // Optional: Render a loading state or null while loading
+  if (!translationsLoaded) {
+     // You might want to return null or a loading indicator here
+     // console.log(`Waiting for client hydration or translations for locale "${locale}"...`);
+     return null;
+  }
+
   return (
     <LocaleContext.Provider value={contextValue}>
-      {(isClient && !isLoading) ? children : null /* Or a loading skeleton */}
+      {children}
     </LocaleContext.Provider>
   );
 };
+
