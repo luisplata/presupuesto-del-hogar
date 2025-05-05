@@ -1,63 +1,100 @@
-// components/ExpenseCharts.tsx
-'use client'; // Ensure this component runs on the client for Recharts
 
-import { useMemo, useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer,
+} from 'recharts';
+import { format, es } from 'date-fns';
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { formatCurrency } from '@/lib/utils'; // Corrected import path
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+// Corrected import paths for chart components
+import { ChartContainer, ChartTooltip, ChartLegend, ChartLegendContent, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
+
+// Define the type for a single day's product expenses
+interface DailyProductExpense {
+    date: string;         // Display date
+    _rawDate: string;      // Internal date key
+    total: number;        // Total expense for the day
+    [productKey: string]: number | string; // Dynamic properties for each product's expense
+}
+
+// Define the type for the data returned by the aggregation function
+interface AggregatedExpenses {
+    data: DailyProductExpense[];
+    productKeys: { [key: string]: string }; // Map of product keys to product names
+}
+
+// ChartConfig type is now exported from @/components/ui/chart
+
+// interface ExpenseChartsProps {
+//     expenses: {
+//         id: string;
+//         // 'date' property seems incorrect based on Expense type, should be 'timestamp'
+//         timestamp: Date | string;
+//         // 'description' seems incorrect, should be 'product'
+//         product: string;
+//         price: number;
+//         // 'productKey' is likely the 'product' name itself for aggregation
+//         // category: string; // Category is also part of Expense
+//     }[];
+// }
+// Use the actual Expense type
 import type { Expense } from '@/types/expense';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
-import { format, subDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { formatCurrency, safelyParseDate } from '@/lib/dateUtils'; // Import utility functions
-import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"; // Import shadcn chart components
-import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton
-import { ScrollArea } from "@/components/ui/scroll-area"; // Import ScrollArea for legend
 
 interface ExpenseChartsProps {
-  expenses: Expense[];
+    expenses: Expense[];
 }
 
-// Interface for aggregated daily expenses with product breakdown
-interface DailyProductExpense {
-  date: string; // Format: 'dd MMM' for display
-  _rawDate: string; // Format: 'yyyy-MM-dd' for sorting
-  total: number; // Total for the day
-  [productKey: string]: number | string; // Product name as key, price as value. Also includes date strings.
-}
 
-// Helper to sanitize product names for use as data keys
-const sanitizeProductKey = (name: string): string => {
-  // Replace spaces and special characters, ensure it starts with a letter
-  return `prod_${name.replace(/[^a-zA-Z0-9_]/g, '_').replace(/^[^a-zA-Z_]+/, '')}`;
-};
+// Function to aggregate expenses by day and product
+const aggregateStackedExpensesByDay = (
+  expenses: Expense[],
+  days: number
+): AggregatedExpenses => {
+  const today = new Date();
+  const cutoffDate = new Date(today);
+  cutoffDate.setDate(today.getDate() - days + 1); // Include the cutoff day itself
+  cutoffDate.setHours(0, 0, 0, 0); // Start of the cutoff day
 
-// Helper to aggregate expenses by day with product breakdown
-const aggregateStackedExpensesByDay = (expenses: Expense[], days: number): { data: DailyProductExpense[], productKeys: { [key: string]: string } } => {
-  const now = new Date();
-  const endDate = endOfDay(now);
-  const startDate = startOfDay(subDays(now, days - 1)); // Go back `days - 1` to include today
-
-  const dailyTotals: { [dateKey: string]: { total: number, products: { [productKey: string]: number } } } = {};
-  const productKeysMap: { [key: string]: string } = {}; // Map sanitized key back to original name
+  const dailyTotals: {
+    [date: string]: {
+      total: number;
+      products: { [productKey: string]: number };
+    };
+  } = {};
+  const productKeysMap: { [key: string]: string } = {}; // Store original product names
   const allDates = new Set<string>();
 
-  // Initialize daily totals for the entire period to ensure all days are shown
-  for (let i = 0; i < days; i++) {
-    const date = startOfDay(subDays(endDate, i));
-    const formattedDate = format(date, 'yyyy-MM-dd');
-    allDates.add(formattedDate);
+  // Initialize daily totals for all dates within the range
+  let currentDate = new Date(cutoffDate);
+  while (currentDate <= today) {
+    const formattedDate = format(currentDate, 'yyyy-MM-dd');
     dailyTotals[formattedDate] = { total: 0, products: {} };
+    allDates.add(formattedDate); // Add date to the set
+    currentDate.setDate(currentDate.getDate() + 1);
   }
 
-  // Filter and aggregate expenses
-  expenses.forEach(expense => {
-    const expenseDate = safelyParseDate(expense.timestamp);
-    if (expenseDate && isWithinInterval(expenseDate, { start: startDate, end: endDate })) {
-      const formattedDate = format(startOfDay(expenseDate), 'yyyy-MM-dd');
-      const productKey = sanitizeProductKey(expense.product);
+  expenses.forEach((expense) => {
+    // Safely parse the timestamp
+    const expenseDate = expense.timestamp instanceof Date ? expense.timestamp : new Date(expense.timestamp);
+    expenseDate.setHours(0, 0, 0, 0); // Consider only the date part
 
+    if (expenseDate >= cutoffDate && expenseDate <= today) {
+      const formattedDate = format(expenseDate, 'yyyy-MM-dd');
+      const productKey = expense.product; // Use product name as the key
+
+      // Store original product name
       if (!productKeysMap[productKey]) {
-        productKeysMap[productKey] = expense.product; // Store original name
+        productKeysMap[productKey] = expense.product;
       }
 
       if (!dailyTotals[formattedDate]) {
@@ -67,7 +104,7 @@ const aggregateStackedExpensesByDay = (expenses: Expense[], days: number): { dat
 
       dailyTotals[formattedDate].products[productKey] = (dailyTotals[formattedDate].products[productKey] || 0) + expense.price;
       dailyTotals[formattedDate].total += expense.price;
-      allDates.add(formattedDate); // Ensure date is tracked
+      // allDates.add(formattedDate); // Date is already added during initialization
     }
   });
 
@@ -153,6 +190,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
 
     const renderChart = (data: DailyProductExpense[], productKeysMap: { [key: string]: string }, period: string) => {
         const productKeys = Object.keys(productKeysMap);
+        // Memoize chartConfig generation
         const chartConfig = useMemo(() => generateChartConfig(productKeysMap), [productKeysMap]);
 
 
@@ -194,31 +232,49 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                             tickMargin={8}
                             width={80} // Adjust width for currency formatting
                         />
-                        <Tooltip
+                         {/* Updated Tooltip */}
+                         <ChartTooltip
                             cursor={false}
                             content={
                                 <ChartTooltipContent
-                                    formatter={(value, name) => `${productKeysMap[name] || name}: ${formatCurrency(value as number)}`}
-                                    indicator="dot"
-                                    labelClassName="font-semibold"
-                                    // Hide the total from the default tooltip items if showing breakdown
-                                    filter={(item) => item.dataKey !== 'total'}
+                                    // Use nameKey to correctly map data keys to config labels
+                                    nameKey="name"
+                                    // Format each item in the tooltip (product: price)
+                                    formatter={(value, name, item) => {
+                                        // 'name' here is the product key (original product name)
+                                        // 'item.name' should also be the product key
+                                        // const originalName = productKeysMap[name as string] || name; // Get original name
+                                        const originalName = name as string;
+                                        return (
+                                            <div className="flex justify-between items-center w-full">
+                                                <span>{originalName}:</span>
+                                                <span className="ml-2 font-semibold">{formatCurrency(value as number)}</span>
+                                            </div>
+                                        );
+                                    }}
                                     // Custom label formatter to show the date and total for the day
                                     labelFormatter={(label, payload) => {
                                         // Find the data point for the current label (date)
                                         const currentData = payload && payload.length > 0 ? payload[0].payload : null;
                                         const dailyTotal = currentData ? currentData.total : 0;
                                         return (
-                                             <>
-                                                <div className="font-semibold">{label}</div>
-                                                <div className="text-muted-foreground">Total: {formatCurrency(dailyTotal)}</div>
+                                            <>
+                                                <div className="font-semibold mb-1">{label}</div>
+                                                <div className="text-muted-foreground border-t pt-1 mt-1">Total Día: {formatCurrency(dailyTotal)}</div>
                                             </>
                                         );
                                     }}
+                                    // Hide the automatically generated total/label in items if we use labelFormatter
+                                    // Filter out the internal 'total' key if it exists in the payload items
+                                    filter={(item) => item.dataKey !== 'total' && item.dataKey !== '_rawDate' && Number(item.value) > 0}
+                                    itemStyle={{ width: '100%' }} // Ensure items take full width
+                                    indicator="dot"
+                                    labelClassName="font-semibold"
+                                    className="min-w-[150px]" // Adjust tooltip width if needed
                                 />
                             }
-                        />
-                         <Legend content={
+                         />
+                         <ChartLegend content={
                             <ChartLegendContent
                                 nameKey="name" // Corresponds to the key in chartConfig
                                 className="flex-wrap justify-center" // Allow legend items to wrap
@@ -237,7 +293,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                 stackId="a" // All product bars belong to the same stack
                                 fill={`var(--color-${productKey})`} // Use color from generated config
                                 radius={[4, 4, 0, 0]} // Apply radius to the top of the bars
-                                name={productKey} // Use sanitized key for internal reference
+                                name={productKey} // Use original key for internal reference and mapping to tooltip/legend
                             />
                         ))}
                     </BarChart>
