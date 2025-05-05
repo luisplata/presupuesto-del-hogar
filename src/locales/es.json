@@ -4,6 +4,10 @@
   "home.description": "Registra y analiza tus gastos fácilmente.",
   "home.exportButton": "Exportar a Excel",
 
+  "tabs.control": "Control de gastos",
+  "tabs.reporting": "Reportería",
+  "tabs.data": "Exportar/Importar Data",
+
   "form.productLabel": "Producto",
   "form.productPlaceholder": "Ej: Café",
   "form.priceLabel": "Precio (COP)",
@@ -89,5 +93,17 @@
 
   "languageSelector.change": "Cambiar Idioma",
   "languageSelector.en": "Inglés",
-  "languageSelector.es": "Español"
+  "languageSelector.es": "Español",
+
+  "dataTab.description": "Exporta tus datos de gastos actuales o importa datos desde un archivo Excel.",
+  "dataTab.importButton": "Importar desde Excel",
+
+  "import.successTitle": "Importación Exitosa",
+  "import.successDescription": "{{count}} gastos importados. Se omitieron {{skipped}} filas debido a errores o datos faltantes.",
+  "import.errorTitle": "Error de Importación",
+  "import.errorDescriptionNoneImported": "No se importaron gastos. Se omitieron {{skipped}} filas debido a errores o datos faltantes.",
+  "import.errorDescriptionNoData": "No se encontraron datos de gastos válidos en el archivo.",
+  "import.genericError": "Ocurrió un error al importar el archivo. Por favor, verifica el formato del archivo e inténtalo de nuevo."
 }
+ 
+    

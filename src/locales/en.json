@@ -4,6 +4,10 @@
   "home.description": "Track and analyze your expenses easily.",
   "home.exportButton": "Export to Excel",
 
+  "tabs.control": "Expense Control",
+  "tabs.reporting": "Reporting",
+  "tabs.data": "Export/Import Data",
+
   "form.productLabel": "Product",
   "form.productPlaceholder": "E.g., Coffee",
   "form.priceLabel": "Price (COP)",
@@ -89,5 +93,17 @@
 
   "languageSelector.change": "Change Language",
   "languageSelector.en": "English",
-  "languageSelector.es": "Spanish"
+  "languageSelector.es": "Spanish",
+
+  "dataTab.description": "Export your current expense data or import data from an Excel file.",
+  "dataTab.importButton": "Import from Excel",
+
+  "import.successTitle": "Import Successful",
+  "import.successDescription": "{{count}} expenses imported. {{skipped}} rows skipped due to errors or missing data.",
+  "import.errorTitle": "Import Error",
+  "import.errorDescriptionNoneImported": "No expenses were imported. {{skipped}} rows skipped due to errors or missing data.",
+  "import.errorDescriptionNoData": "No valid expense data found in the file.",
+  "import.genericError": "An error occurred while importing the file. Please check the file format and try again."
 }
+ 
+    
