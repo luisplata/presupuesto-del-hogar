@@ -93,3 +93,4 @@ This application is configured to be installable as a PWA on compatible desktop 
     *   **Wait/Reload:** Sometimes it takes a moment or a reload for the browser to recognize the PWA criteria.
 *   **PWA Icons Not Showing After Install:** Double-check that the *actual image files* exist at the paths specified in `public/manifest.json` and `pages/_document.tsx`. Ensure they are valid PNGs. Clear the browser cache or uninstall/reinstall the PWA.
 
+
