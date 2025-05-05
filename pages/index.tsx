@@ -7,7 +7,8 @@ import * as XLSX from 'xlsx'; // Import xlsx library
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ProductHistory } from '@/components/ProductHistory';
-import { ExpenseCharts } from '@/components/ExpenseCharts'; // Import the new charts component
+import { CategoryHistory } from '@/components/CategoryHistory'; // Import CategoryHistory
+import { ExpenseCharts } from '@/components/ExpenseCharts'; // Import the charts component
 // Toaster is now in _app.tsx
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
@@ -61,6 +62,12 @@ export default function Home() {
      setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product !== productNameToDelete));
    };
 
+   // Handler to delete all expenses for a specific category
+   const handleDeleteCategory = (categoryNameToDelete: string) => {
+        // Also handle the case where the category might be the default one
+       setExpenses(prevExpenses => prevExpenses.filter(expense => (expense.category || DEFAULT_CATEGORY) !== categoryNameToDelete));
+   };
+
 
   const handleExportToExcel = () => {
      // Ensure this runs only on the client
@@ -76,7 +83,7 @@ export default function Home() {
        .map(exp => ({
           Producto: exp.product,
           Precio: exp.price, // Keep as number for Excel calculations
-          Categoría: exp.category, // Add category column
+          Categoría: exp.category || DEFAULT_CATEGORY, // Add category column, default if undefined
           'Fecha y Hora': formatDate(exp.timestamp), // Format date for readability
        }));
 
@@ -135,12 +142,19 @@ export default function Home() {
 
           <div className="md:col-span-2 space-y-6">
              <ExpenseSummary expenses={expenses} />
+             {/* Product History */}
              <ProductHistory
                expenses={expenses}
                onDeleteExpense={handleDeleteExpense}
-               onDeleteProduct={handleDeleteProduct}
+               onDeleteProduct={handleDeleteProduct} // Specific handler passed
               />
-             {/* Add the new ExpenseCharts component here */}
+             {/* Category History */}
+             <CategoryHistory
+               expenses={expenses}
+               onDeleteExpense={handleDeleteExpense}
+               onDeleteCategory={handleDeleteCategory} // New handler passed
+             />
+             {/* Expense Charts */}
              <ExpenseCharts expenses={expenses} />
           </div>
          </div>
@@ -150,4 +164,3 @@ export default function Home() {
     </>
   );
 }
-

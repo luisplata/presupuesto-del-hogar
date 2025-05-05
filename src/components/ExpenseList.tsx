@@ -36,10 +36,21 @@ interface ExpenseListProps {
   title?: string;
   caption?: string;
   onDeleteExpense: (id: string) => void;
-  onDeleteProduct?: (productName: string) => void; // Optional: Handler to delete all expenses for a product
+  // Generic group deletion props
+  groupName?: string;         // Name of the current group (product or category) being viewed
+  onDeleteGroup?: (name: string) => void; // Handler to delete all expenses for the group
+  groupTypeLabel?: string;   // Label for the group type (e.g., "Producto", "Categoría")
 }
 
-export function ExpenseList({ expenses, title = "Historial de Gastos", caption = "Lista de todos tus gastos.", onDeleteExpense, onDeleteProduct }: ExpenseListProps) {
+export function ExpenseList({
+  expenses,
+  title = "Historial de Gastos",
+  caption = "Lista de todos tus gastos.",
+  onDeleteExpense,
+  groupName, // Use generic prop
+  onDeleteGroup, // Use generic prop
+  groupTypeLabel // Use generic prop
+}: ExpenseListProps) {
   const { toast } = useToast();
 
   const handleDeleteClick = (expenseId: string) => {
@@ -50,12 +61,13 @@ export function ExpenseList({ expenses, title = "Historial de Gastos", caption =
      });
   };
 
-  const handleDeleteProductClick = (productName: string) => {
-    if (onDeleteProduct) {
-      onDeleteProduct(productName);
+  // Renamed handler for clarity
+  const handleDeleteGroupClick = (name: string) => {
+    if (onDeleteGroup) {
+      onDeleteGroup(name);
       toast({
-        title: "Producto eliminado",
-        description: `Todas las entradas para "${productName}" han sido eliminadas.`,
+        title: `${groupTypeLabel || 'Grupo'} eliminado`, // Use groupTypeLabel
+        description: `Todas las entradas para "${name}" han sido eliminadas.`,
       });
     }
   };
@@ -74,35 +86,38 @@ export function ExpenseList({ expenses, title = "Historial de Gastos", caption =
     )
   }
 
-  // Determine if we are showing a list filtered by a single product
-  const isSingleProductView = new Set(expenses.map(e => e.product)).size === 1 && expenses.length > 0;
-  const singleProductName = isSingleProductView ? expenses[0].product : '';
+  // Determine if we are showing a list filtered by a single group (product or category)
+  // Check if onDeleteGroup is provided, which implies a filtered view that might allow deletion
+  const isSingleGroupView = !!onDeleteGroup && !!groupName;
 
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{title}</CardTitle>
-        {/* Show Delete Product Button only if onDeleteProduct is provided and it's a single product view */}
-        {onDeleteProduct && isSingleProductView && (
+        {/* Show Delete Group Button only if it's a single group view */}
+        {isSingleGroupView && (
              <AlertDialog>
                 <AlertDialogTrigger asChild>
+                    {/* Use groupTypeLabel and groupName in the button text */}
                     <Button variant="destructive" size="sm">
-                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar Producto ({singleProductName})
+                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar {groupTypeLabel} ({groupName})
                     </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                     <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                    {/* Use groupTypeLabel and groupName in the dialog description */}
                     <AlertDialogDescription>
-                         Esta acción no se puede deshacer. Esto eliminará permanentemente todas las entradas para el producto
-                         <span className="font-semibold"> "{singleProductName}"</span>.
+                         Esta acción no se puede deshacer. Esto eliminará permanentemente todas las entradas para {groupTypeLabel?.toLowerCase() || 'el grupo'}
+                         <span className="font-semibold"> "{groupName}"</span>.
                     </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteProductClick(singleProductName)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Eliminar Producto
+                    {/* Use groupTypeLabel in the action button */}
+                    <AlertDialogAction onClick={() => handleDeleteGroupClick(groupName!)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        Eliminar {groupTypeLabel}
                     </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -113,22 +128,16 @@ export function ExpenseList({ expenses, title = "Historial de Gastos", caption =
         <Table>
           <TableCaption>{caption}</TableCaption>
           <TableHeader>
-            {/* IMPORTANT: Ensure no whitespace between TableRow and TableCell elements */}
-            {/* Added Categoría header */}
             <TableRow><TableHead>Producto</TableHead><TableHead>Precio</TableHead><TableHead>Categoría</TableHead><TableHead>Fecha y Hora</TableHead><TableHead className="text-right">Acciones</TableHead></TableRow>
           </TableHeader>
           <TableBody>
             {expenses
               .sort((a, b) => {
-                // Safely convert timestamps to numbers for comparison
                 const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
                 const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
                 return timeB - timeA;
               })
               .map((expense) => (
-              // IMPORTANT: Ensure no whitespace between TableRow and TableCell elements,
-              // AND no whitespace around the <TableRow> tag itself within the map.
-              // Added TableCell for category with Badge
               <TableRow key={expense.id}><TableCell className="font-medium">{expense.product}</TableCell><TableCell>{formatCurrency(expense.price)}</TableCell><TableCell><Badge variant={expense.category === 'no definido' ? 'secondary' : 'outline'}>{expense.category || 'no definido'}</Badge></TableCell><TableCell>{formatDate(expense.timestamp)}</TableCell><TableCell className="text-right"><AlertDialog><AlertDialogTrigger asChild><Button variant="ghost" size="icon"><Trash2 className="h-4 w-4 text-destructive" /><span className="sr-only">Eliminar</span></Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Estás seguro?</AlertDialogTitle><AlertDialogDescription>Esta acción no se puede deshacer. Esto eliminará permanentemente el gasto<span className="font-semibold"> "{expense.product}" </span> con precio <span className="font-semibold">{formatCurrency(expense.price)}</span>.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => handleDeleteClick(expense.id)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Eliminar Gasto</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog></TableCell></TableRow>
             ))}
           </TableBody>
