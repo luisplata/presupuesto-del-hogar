@@ -1,18 +1,18 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    LineChart, // Changed from BarChart
-    Line,      // Added Line
-    Area,      // Added Area
+    LineChart,
+    Line,
+    Area,
     XAxis,
     YAxis,
     CartesianGrid,
     ResponsiveContainer,
+    Tooltip // Import Tooltip directly from recharts
 } from 'recharts';
 import { format as formatDateFns } from 'date-fns';
-// Correct import path for locales (keep for date formatting logic if needed)
+// Correct import path for locales
 import { es } from 'date-fns/locale/es';
-import { enUS } from 'date-fns/locale/en-US';
 
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,7 +20,7 @@ import { formatCurrency } from '@/lib/dateUtils'; // Corrected import path
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Corrected import paths for chart components
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart" // Removed ChartLegend, ChartLegendContent imports
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 
 
 // Define the type for a single day's product expenses
@@ -37,7 +37,6 @@ interface AggregatedExpenses {
     productKeys: { [key: string]: string }; // Map of product keys to product names
 }
 
-// ChartConfig type is now exported from @/components/ui/chart
 
 // Use the actual Expense type
 import type { Expense } from '@/types/expense';
@@ -47,7 +46,7 @@ interface ExpenseChartsProps {
 }
 
 
-// Function to aggregate expenses by day and product
+// Function to aggregate expenses by day and product (remains largely the same)
 const aggregateStackedExpensesByDay = (
   expenses: Expense[],
   days: number
@@ -56,7 +55,7 @@ const aggregateStackedExpensesByDay = (
   const cutoffDate = new Date(today);
   cutoffDate.setDate(today.getDate() - days + 1); // Include the cutoff day itself
   cutoffDate.setHours(0, 0, 0, 0); // Start of the cutoff day
-  
+
   interface DailyTotalsType {
     [date: string]: { // index signature
       total: number;
@@ -94,13 +93,11 @@ const aggregateStackedExpensesByDay = (
       }
 
       if (!dailyTotals[formattedDate]) {
-        // Should not happen due to pre-initialization, but safeguard
         dailyTotals[formattedDate] = { total: 0, products: {} };
       }
 
       dailyTotals[formattedDate].products[productKey] = (dailyTotals[formattedDate].products[productKey] || 0) + expense.price;
       dailyTotals[formattedDate].total += expense.price;
-      // allDates.add(formattedDate); // Date is already added during initialization
     }
   });
 
@@ -108,7 +105,6 @@ const aggregateStackedExpensesByDay = (
   const aggregatedData = Array.from(allDates)
     .map(dateKey => {
       const dayData = dailyTotals[dateKey];
-      // Use date-fns for localized date formatting
       const displayDate = formatDateFns(new Date(dateKey + 'T00:00:00'), 'dd MMM', { locale: dateFnsLocale });
 
       const productEntries = dayData ? dayData.products : {};
@@ -126,8 +122,6 @@ const aggregateStackedExpensesByDay = (
   // Ensure all product keys exist in every data point (with value 0 if absent)
   const finalData = aggregatedData.map(dayData => {
     const completeDayData:DailyProductExpense = { ...dayData };
-
-
     Object.keys(productKeysMap).forEach(productKey => {
       if (!(productKey in completeDayData)) {
         completeDayData[productKey] = 0;
@@ -141,16 +135,22 @@ const aggregateStackedExpensesByDay = (
 };
 
 // Function to generate chart config dynamically with random colors
+// Add a 'total' entry for the main line/area styling
 const generateChartConfig = (productKeysMap: { [key: string]: string }): ChartConfig => {
-    const config: ChartConfig = {};
+    const config: ChartConfig = {
+        // Style for the total line/area
+        total: {
+            label: 'Total',
+            color: 'hsl(var(--chart-1))', // Use a primary chart color
+        },
+    };
     const productKeys = Object.keys(productKeysMap);
 
-    productKeys.forEach((key) => {
-        // Generate random HSL values for better visual distinction
-        const hue = Math.floor(Math.random() * 360);
-        // Keep saturation and lightness in ranges that provide decent visibility
-        const saturation = Math.floor(Math.random() * 41) + 50; // 50-90% saturation
-        const lightness = Math.floor(Math.random() * 31) + 50; // 50-80% lightness (further from black)
+    productKeys.forEach((key, index) => {
+        // Generate HSL colors, trying to space them out more
+        const hue = (index * (360 / (productKeys.length + 1))) % 360; // Distribute hues
+        const saturation = Math.floor(Math.random() * 21) + 70; // 70-90% saturation
+        const lightness = Math.floor(Math.random() * 21) + 55; // 55-75% lightness
         const randomColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 
         config[key] = {
@@ -192,10 +192,55 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
 
     }, [expenses]); // Recalculate when expenses change
 
+    // Custom Tooltip Content Component
+    const CustomTooltip = ({ active, payload, label, config, productKeysMap }: any) => {
+        if (active && payload && payload.length) {
+            const data = payload[0].payload as DailyProductExpense; // The full data for the hovered day
+
+            // Filter product keys with expenses > 0 for this day
+            const productsWithExpenses = Object.entries(productKeysMap)
+                .map(([key, name]) => ({
+                    key,
+                    name,
+                    value: data[key] as number,
+                    color: config[key]?.color || '#ccc' // Fallback color
+                }))
+                .filter(p => p.value > 0)
+                .sort((a,b) => b.value - a.value); // Sort by value descending
+
+            return (
+                <div className="rounded-lg border bg-background p-2.5 text-sm shadow-lg">
+                    <div className="mb-1.5 font-medium">{label}</div> {/* Date */}
+                    <div className="mb-1 border-t pt-1 font-semibold">
+                        Total Día: {formatCurrency(data.total)}
+                    </div>
+                    <div className="grid gap-1">
+                        {productsWithExpenses.map((product) => (
+                            <div key={product.key} className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-1.5">
+                                    <span
+                                        className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
+                                        style={{ backgroundColor: product.color }}
+                                    />
+                                    <span className="text-muted-foreground">{product.name}:</span>
+                                </div>
+                                <span className="font-semibold">{formatCurrency(product.value)}</span>
+                            </div>
+                        ))}
+                         {productsWithExpenses.length === 0 && (
+                             <div className="text-muted-foreground text-xs">Sin gastos registrados para este día.</div>
+                         )}
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
     const renderChart = (data: DailyProductExpense[], productKeysMap: { [key: string]: string }, period: string) => {
         // Memoize chartConfig generation. Colors will be random but stable unless productKeysMap changes.
         const chartConfig = useMemo(() => generateChartConfig(productKeysMap), [productKeysMap]);
-        const productKeys = Object.keys(productKeysMap); // Get keys after config generation
+        // Removed productKeys constant as it's not directly used for rendering lines anymore
 
 
         if (!isClient) {
@@ -219,9 +264,9 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
          }
 
         return (
-            <ChartContainer config={chartConfig} className="min-h-[350px] w-full mt-4">
+            // Use ChartContainer config for CSS variables, even if not directly mapping lines
+             <ChartContainer config={chartConfig} className="min-h-[350px] w-full mt-4">
                 <ResponsiveContainer width="100%" height={350}>
-                    {/* Changed BarChart to LineChart */}
                     <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
                         <XAxis
@@ -237,71 +282,38 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                             tickMargin={8}
                             width={80} // Adjust width for currency formatting
                         />
-                         <ChartTooltip
-                            cursor={true} // Show cursor line on hover for line chart
-                            content={
-                                <ChartTooltipContent
-                                    // Use nameKey to correctly map data keys to config labels
-                                    nameKey="name" // Ensure this maps to the product key in config
-                                    // Format each item in the tooltip (product: price)
-                                     formatter={(value, name, item) => {
-                                      // Filter out internal keys and items with value 0
-                                      if (item.dataKey === 'total' || item.dataKey === '_rawDate' || Number(item.value) <= 0) {
-                                          return null;
-                                      }
-                                      // 'name' is the product key from the config
-                                      // 'item.name' is the original data key (product name) used in <Bar>
-                                      const originalName = item.name; // Get original name from Bar's name prop
-                                      return (
-                                          <div className="flex justify-between items-center w-full">
-                                              {/* Use item.color for the dot indicator */}
-                                              <span className="flex items-center mr-2">
-                                                  <span className="w-2.5 h-2.5 rounded-full mr-1.5" style={{ backgroundColor: item.color }} />
-                                                  {originalName}:
-                                              </span>
-                                                <span className="ml-2 font-semibold">{formatCurrency(value as number)}</span>
-                                            </div>
-                                        );
-                                    }}
-                                    // Custom label formatter to show the date and total for the day
-                                    labelFormatter={(label, payload) => {
-                                        // Find the data point for the current label (date)
-                                        const currentData = payload && payload.length > 0 ? payload[0].payload : null;
-                                        const dailyTotal = currentData ? currentData.total : 0;
-                                        return (
-                                            <>
-                                                <div className="font-semibold mb-1">{label}</div>
-                                                <div className="text-muted-foreground border-t pt-1 mt-1">Total Día: {formatCurrency(dailyTotal)}</div>
-                                            </>
-                                        );
-                                    }}
-                                    className="min-w-[150px]" // Adjust tooltip width if needed
-                                />
-                            }
+                         {/* Use the custom tooltip component */}
+                         <Tooltip
+                             cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} // Customize cursor appearance
+                             content={<CustomTooltip config={chartConfig} productKeysMap={productKeysMap} />}
                          />
 
-                        {/* Changed Bar to Line and Area components */}
-                        {productKeys.map((productKey) => (
-                             <React.Fragment key={productKey}>
-                                <Area // Area component for stacking - change type to linear
-                                    type="linear"
-                                    dataKey={productKey}
-                                    stackId="a" // Stack areas together
-                                    stroke="none" // Area doesn't need a visible stroke itself
-                                    fill={`var(--color-${productKey})`} // Fill with product color
-                                    fillOpacity={0.6} // Make fill slightly transparent
-                                    name={productKeysMap[productKey]} // Name for tooltip
-                                 />
-                                <Line // Line component for the visual line edge - change type to linear
-                                     type="linear"
-                                     dataKey={productKey}
-                                     stroke={`var(--color-${productKey})`} // Use product color for line
-                                     strokeWidth={2}
-                                     dot={false} // Hide dots on the line itself, tooltip shows info
-                                     name={productKeysMap[productKey]} // Name for tooltip
-                                 />
-                            </React.Fragment>
-                        ))}
+                        {/* Single Area for total */}
+                        <Area
+                            type="linear"
+                            dataKey="total"
+                            stroke="none"
+                            fill="var(--color-total)" // Use color defined in chartConfig
+                            fillOpacity={0.4}
+                        />
+                        {/* Single Line for total */}
+                         <Line
+                             type="linear"
+                             dataKey="total"
+                             stroke="var(--color-total)" // Use color defined in chartConfig
+                             strokeWidth={2}
+                             dot={false}
+                             activeDot={{ // Style the active dot on hover
+                                 r: 6,
+                                 fill: 'var(--color-total)',
+                                 stroke: 'hsl(var(--background))',
+                                 strokeWidth: 2,
+                             }}
+                         />
+
+                        {/* No longer render individual lines/areas per product */}
+                        {/* {productKeys.map((productKey) => ( ... ))} */}
+
                     </LineChart>
                 </ResponsiveContainer>
             </ChartContainer>
@@ -312,7 +324,8 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Análisis de Gastos por Día y Producto (Gráfico de Área Apilada)</CardTitle>
+        {/* Updated Title */}
+        <CardTitle>Análisis de Gastos Totales por Día (Gráfico de Línea)</CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="7days" className="w-full">
@@ -335,3 +348,5 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
     </Card>
   );
 }
+
+    
