@@ -11,7 +11,9 @@ import {
   endOfDay,
   format, // Import format for better control
 } from 'date-fns';
-import { es, enUS } from 'date-fns/locale'; // Import Spanish and English locales directly
+// Correct import paths for locales
+import { es } from 'date-fns/locale/es';
+import { enUS } from 'date-fns/locale/en-US';
 import type { Expense } from '@/types/expense';
 
 // Helper to safely parse date strings or use Date objects

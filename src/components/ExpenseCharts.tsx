@@ -10,7 +10,10 @@ import {
     ResponsiveContainer,
 } from 'recharts';
 import { format as formatDateFns } from 'date-fns';
-import { es } from 'date-fns/locale'; // Import 'es' locale directly
+// Correct import path for locales
+import { es } from 'date-fns/locale/es';
+import { enUS } from 'date-fns/locale/en-US';
+
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { formatCurrency } from '@/lib/dateUtils'; // Corrected import path
@@ -63,7 +66,7 @@ const aggregateStackedExpensesByDay = (
   } = {};
   const productKeysMap: { [key: string]: string } = {}; // Store original product names
   const allDates = new Set<string>();
-  const dateFnsLocale = locale === 'es' ? es : undefined; // Get date-fns locale
+  const dateFnsLocale = locale === 'es' ? es : enUS; // Get date-fns locale
 
   // Initialize daily totals for all dates within the range
   let currentDate = new Date(cutoffDate);

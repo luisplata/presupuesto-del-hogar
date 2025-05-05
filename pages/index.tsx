@@ -19,6 +19,7 @@ import { formatDate, formatCurrency } from '@/lib/dateUtils'; // Import formatte
 import Head from 'next/head'; // Import Head for page-specific metadata
 import { useLocale } from '@/hooks/useLocale'; // Import the useLocale hook
 import { LanguageSelector } from '@/components/LanguageSelector'; // Import LanguageSelector
+// LocaleProvider is now in _app.tsx
 
 const DEFAULT_CATEGORY_KEY = 'category.undefined'; // Key for the default category
 

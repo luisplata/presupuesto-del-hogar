@@ -1,9 +1,10 @@
 
 // src/contexts/LocaleContext.tsx
 import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { useRouter } from 'next/router';
+// Removed useRouter import as we are managing locale client-side now
 import en from '@/locales/en.json';
 import es from '@/locales/es.json';
+import useLocalStorage from '@/hooks/useLocalStorage'; // Import useLocalStorage
 
 // Define the structure of your translations
 interface Translations {
@@ -18,16 +19,21 @@ interface LocaleContextType {
   locale: string;
   setLocale: (locale: string) => void;
   t: (key: string, options?: Record<string, string | number>) => string; // Add interpolation options
-  currentLocale: string; // Add currentLocale for easier access outside components if needed
+  currentLocale: string;
 }
 
-// Default locale determination (runs on both server and client initially)
-const getDefaultLocale = (router: ReturnType<typeof useRouter>): string => {
-    // On the server, router.locale might not be available yet, rely on defaultLocale
-    // On the client, router.locale should be preferred after hydration
-    return router.locale || router.defaultLocale || 'en';
+// Default locale determination (client-side only)
+const getDefaultLocale = (): string => {
+    if (typeof window === 'undefined') return 'en'; // Default on server
+    // Check localStorage first
+    const storedLocale = window.localStorage.getItem('locale');
+    if (storedLocale && ['en', 'es'].includes(storedLocale)) {
+        return storedLocale;
+    }
+    // Fallback to browser language
+    const browserLang = navigator.language.split('-')[0];
+    return ['en', 'es'].includes(browserLang) ? browserLang : 'en'; // Default to 'en'
 };
-
 
 // Create the context with a default value
 export const LocaleContext = createContext<LocaleContextType>({
@@ -60,61 +66,39 @@ const getNestedValue = (obj: Translations, key: string): string | undefined => {
     return typeof current === 'string' ? current : undefined; // Return only if it's a string
 };
 
-
 // Create the provider component
 export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
-  const router = useRouter();
-  // Initialize state using the router's default locale or fallback
-  const [locale, setLocaleState] = useState<string>(() => getDefaultLocale(router));
-  const [isRouterReady, setIsRouterReady] = useState(false);
+  // Use useLocalStorage to manage locale state persistence
+  const [locale, setLocale] = useLocalStorage<string>('locale', getDefaultLocale());
+  const [isClient, setIsClient] = useState(false);
 
-  // Track router readiness separately
+  // Track client-side hydration
   useEffect(() => {
-      if (router.isReady) {
-          setIsRouterReady(true);
+      setIsClient(true);
+      // Re-evaluate default locale once client is available
+      const initialLocale = getDefaultLocale();
+      if (locale !== initialLocale) {
+          setLocale(initialLocale);
       }
-  }, [router.isReady]);
+  }, [locale, setLocale]); // Only update if locale differs from evaluated default
 
 
-  // Update locale state based on router changes, only when router is ready
-  useEffect(() => {
-    if (isRouterReady) {
-      const currentRouterLocale = router.locale || router.defaultLocale || 'en';
-      if (locale !== currentRouterLocale) {
-        // console.log(`Router locale changed to: ${currentRouterLocale}. Updating context.`);
-        setLocaleState(currentRouterLocale);
-      }
-    }
-     // Only depend on isRouterReady and router.locale (and defaultLocale for stability)
-  }, [isRouterReady, router.locale, router.defaultLocale, locale]); // Added locale back as it should update if changed externally too
-
-
-  const setLocale = useCallback((newLocale: string) => {
-     // Ensure router is ready before attempting to push
-    if (!isRouterReady) {
-        console.warn("Router not ready, skipping locale change");
-        return;
-    }
-    // Check if the new locale is valid and different from the current one
-    if (router.locales?.includes(newLocale) && newLocale !== locale) {
-      // console.log(`Attempting to change locale from ${locale} to ${newLocale}`);
-      // Keep existing query parameters, change locale
-      router.push({ pathname: router.pathname, query: router.query }, router.asPath, { locale: newLocale, scroll: false });
-      // State update will be triggered by the useEffect above when router.locale changes
+  const handleSetLocale = useCallback((newLocale: string) => {
+     // Check if the new locale is valid and different from the current one
+    if (['en', 'es'].includes(newLocale) && newLocale !== locale) {
+        setLocale(newLocale); // Update state and localStorage via useLocalStorage hook
     } else if (newLocale === locale) {
         // console.log(`Locale ${newLocale} is already set.`);
-        // Do nothing if locale is already set
     } else {
         console.warn(`Locale "${newLocale}" is not supported.`);
     }
-    // Depend on router object fields that affect the push behavior and the current locale state
-  }, [isRouterReady, router.pathname, router.query, router.asPath, router.locales, locale]);
+  }, [locale, setLocale]);
 
 
   // Translation function
   const t = useCallback((key: string, options?: Record<string, string | number>): string => {
-      // Use the state `locale` which is updated via useEffect
-      const currentSelectedLocale = locale;
+      // Use the state `locale` which is updated via useLocalStorage
+      const currentSelectedLocale = locale || 'en'; // Fallback if locale is somehow null
       const currentTranslations = translations[currentSelectedLocale] || translations['en']; // Fallback to English
       let translation = getNestedValue(currentTranslations, key);
 
@@ -140,15 +124,15 @@ export const LocaleProvider: React.FC<LocaleProviderProps> = ({ children }) => {
 
   const contextValue = {
     locale, // The actual current locale state
-    setLocale,
+    setLocale: handleSetLocale, // Use the handler that updates localStorage
     t,
     currentLocale: locale, // Provide current locale directly
   };
 
-  // Render children only when the router is ready and locale is definitively set
+  // Render children only when the client is hydrated to avoid mismatches
   return (
     <LocaleContext.Provider value={contextValue}>
-      {isRouterReady ? children : null /* Or a loading indicator */}
+      {isClient ? children : null /* Or a loading indicator */}
     </LocaleContext.Provider>
   );
 };
