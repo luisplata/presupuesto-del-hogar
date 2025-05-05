@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     BarChart,
@@ -5,8 +6,8 @@ import {
     XAxis,
     YAxis,
     CartesianGrid,
-    Tooltip,
-    Legend,
+    // Tooltip, // Using ChartTooltip from shadcn
+    // Legend, // Removed Legend
     ResponsiveContainer,
 } from 'recharts';
 import { format, es } from 'date-fns';
@@ -16,7 +17,7 @@ import { formatCurrency } from '@/lib/dateUtils'; // Corrected import path
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Corrected import paths for chart components
-import { ChartContainer, ChartTooltip, ChartLegend, ChartLegendContent, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart" // Removed ChartLegend, ChartLegendContent imports
 
 // Define the type for a single day's product expenses
 interface DailyProductExpense {
@@ -34,18 +35,6 @@ interface AggregatedExpenses {
 
 // ChartConfig type is now exported from @/components/ui/chart
 
-// interface ExpenseChartsProps {
-//     expenses: {
-//         id: string;
-//         // 'date' property seems incorrect based on Expense type, should be 'timestamp'
-//         timestamp: Date | string;
-//         // 'description' seems incorrect, should be 'product'
-//         product: string;
-//         price: number;
-//         // 'productKey' is likely the 'product' name itself for aggregation
-//         // category: string; // Category is also part of Expense
-//     }[];
-// }
 // Use the actual Expense type
 import type { Expense } from '@/types/expense';
 
@@ -216,7 +205,8 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
         return (
             <ChartContainer config={chartConfig} className="min-h-[350px] w-full mt-4">
                 <ResponsiveContainer width="100%" height={350}>
-                    <BarChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 40 }}> {/* Increased bottom margin for legend */}
+                    {/* Removed Legend props from BarChart */}
+                    <BarChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}> {/* Reduced bottom margin as legend is removed */}
                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
                         <XAxis
                             dataKey="date"
@@ -231,22 +221,28 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                             tickMargin={8}
                             width={80} // Adjust width for currency formatting
                         />
-                         {/* Updated Tooltip */}
+                         {/* Updated Tooltip still shows product breakdown on hover */}
                          <ChartTooltip
                             cursor={false}
                             content={
                                 <ChartTooltipContent
                                     // Use nameKey to correctly map data keys to config labels
-                                    nameKey="name"
+                                    nameKey="name" // Ensure this maps to the product key in config
                                     // Format each item in the tooltip (product: price)
                                     formatter={(value, name, item) => {
-                                        // 'name' here is the product key (original product name)
-                                        // 'item.name' should also be the product key
-                                        // const originalName = productKeysMap[name as string] || name; // Get original name
-                                        const originalName = name as string;
+                                        // 'name' is the product key from the config
+                                        // 'item.name' is the original data key (product name) used in <Bar>
+                                        const originalName = item.name; // Get original name from Bar's name prop
                                         return (
                                             <div className="flex justify-between items-center w-full">
-                                                <span>{originalName}:</span>
+                                                {/* Use item.color for the dot indicator */}
+                                                <span className="flex items-center mr-2">
+                                                    <span
+                                                        className="w-2.5 h-2.5 rounded-full mr-1.5"
+                                                        style={{ backgroundColor: item.color }}
+                                                     />
+                                                    {originalName}:
+                                                </span>
                                                 <span className="ml-2 font-semibold">{formatCurrency(value as number)}</span>
                                             </div>
                                         );
@@ -263,28 +259,17 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                             </>
                                         );
                                     }}
-                                    // Hide the automatically generated total/label in items if we use labelFormatter
-                                    // Filter out the internal 'total' key if it exists in the payload items
-                                    // Also filter out items with value 0 to avoid clutter
+                                    // Filter out internal keys and items with value 0
                                     filter={(item) => item.dataKey !== 'total' && item.dataKey !== '_rawDate' && Number(item.value) > 0}
                                     itemStyle={{ width: '100%' }} // Ensure items take full width
-                                    indicator="dot"
+                                    indicator="dot" // Use dot indicator within formatter now
+                                    hideIndicator={true} // Hide default indicator as we format it ourselves
                                     labelClassName="font-semibold"
                                     className="min-w-[150px]" // Adjust tooltip width if needed
                                 />
                             }
                          />
-                         <ChartLegend content={
-                            <ChartLegendContent
-                                nameKey="name" // Corresponds to the key in chartConfig
-                                className="flex-wrap justify-center" // Allow legend items to wrap
-                                style={{
-                                     maxHeight: '60px', // Limit legend height
-                                     overflowY: 'auto', // Make legend scrollable if needed
-                                     paddingBottom: '10px' // Add some padding below legend
-                                }}
-                             />
-                         } verticalAlign="bottom" wrapperStyle={{ bottom: 0, left: 0, right: 0, position: 'absolute' }}/>
+                         {/* ChartLegend component removed */}
 
                         {productKeys.map((productKey) => (
                             <Bar
@@ -293,7 +278,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                 stackId="a" // All product bars belong to the same stack
                                 fill={`var(--color-${productKey})`} // Use color from generated config
                                 radius={[4, 4, 0, 0]} // Apply radius to the top of the bars
-                                name={productKey} // Use original key for internal reference and mapping to tooltip/legend
+                                name={productKeysMap[productKey]} // Use original product name for tooltip mapping
                             />
                         ))}
                     </BarChart>
