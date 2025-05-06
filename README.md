@@ -1,4 +1,3 @@
-
 # Expense Tracker (using Next.js Pages Router)
 
 This is a Next.js application for tracking expenses, built using the Pages Router for compatibility with `next export` and static hosting like GitHub Pages. It includes Progressive Web App (PWA) features, making it installable on supported devices.
@@ -92,5 +91,21 @@ This application is configured to be installable as a PWA on compatible desktop 
     *   **Browser Cache/State:** Try clearing your browser's cache and site data for the deployed URL, or test in an incognito/private window. Check your browser's app settings (e.g., `edge://apps` in Edge) to see if the site is already listed or blocked.
     *   **Wait/Reload:** Sometimes it takes a moment or a reload for the browser to recognize the PWA criteria.
 *   **PWA Icons Not Showing After Install:** Double-check that the *actual image files* exist at the paths specified in `public/manifest.json` and `pages/_document.tsx`. Ensure they are valid PNGs. Clear the browser cache or uninstall/reinstall the PWA.
-
-
+*   **Server Error: Cannot find module './chunks/...' or similar build errors:** These errors often indicate corrupted build artifacts or dependencies. Try the following steps:
+    1.  **Stop the development server.**
+    2.  **Delete the `.next` directory:**
+        ```bash
+        rm -rf .next
+        ```
+    3.  **(Optional but recommended) Delete `node_modules` and the lock file:**
+        ```bash
+        rm -rf node_modules package-lock.json # or yarn.lock
+        ```
+    4.  **Reinstall dependencies:**
+        ```bash
+        npm install # or yarn install
+        ```
+    5.  **Restart the development server:**
+        ```bash
+        npm run dev
+        ```
