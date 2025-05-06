@@ -80,10 +80,10 @@ const aggregateStackedExpensesByDay = (
 
   expenses.forEach((expense) => {
     // Safely parse the timestamp
-    const expenseDate = expense.timestamp instanceof Date ? expense.timestamp : new Date(expense.timestamp);
+    const expenseDate =  new Date(expense.timestamp);
     expenseDate.setHours(0, 0, 0, 0); // Consider only the date part
 
-    if (expenseDate >= cutoffDate && expenseDate <= today) {
+        if (expenseDate >= cutoffDate && expenseDate <= today) {
       const formattedDate = formatDateFns(expenseDate, 'yyyy-MM-dd');
       const productKey = expense.product; // Use product name as the key
 
@@ -110,6 +110,7 @@ const aggregateStackedExpensesByDay = (
       const productEntries = dayData ? dayData.products : {};
       const totalEntry = dayData ? dayData.total : 0;
 
+
       return {
         date: displayDate,
         _rawDate: dateKey,
@@ -122,11 +123,14 @@ const aggregateStackedExpensesByDay = (
   // Ensure all product keys exist in every data point (with value 0 if absent)
   const finalData = aggregatedData.map(dayData => {
     const completeDayData:DailyProductExpense = { ...dayData };
-    Object.keys(productKeysMap).forEach(productKey => {
-      if (!(productKey in completeDayData)) {
-        completeDayData[productKey] = 0;
-      }
-    });
+      Object.keys(productKeysMap).forEach(productKey => {
+          if (!(productKey in completeDayData)) {
+              completeDayData[productKey] = 0;
+          }
+      });
+
+
+
     return completeDayData;
   });
 
@@ -205,7 +209,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                     value: data[key] as number,
                     color: config[key]?.color || '#ccc' // Fallback color
                 }))
-                .filter(p => p.value > 0)
+                .filter(p => p.value > 0 && typeof p.name === "string")
                 .sort((a,b) => b.value - a.value); // Sort by value descending
 
             return (
