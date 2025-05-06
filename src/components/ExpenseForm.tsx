@@ -124,13 +124,14 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 rounded-lg border bg-card p-6 shadow-sm">
+       {/* Adjust padding and spacing */}
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3 sm:space-y-4 rounded-lg border bg-card p-4 sm:p-6 shadow-sm">
         <FormField
           control={form.control}
           name="product"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Producto</FormLabel>
+              <FormLabel className="text-xs sm:text-sm">Producto</FormLabel>
               <FormControl>
                 <Input placeholder="Ej: Café" {...field} />
               </FormControl>
@@ -143,7 +144,7 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
           name="price"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Precio (COP)</FormLabel>
+              <FormLabel className="text-xs sm:text-sm">Precio (COP)</FormLabel>
               <FormControl>
                 <Input
                   type="text" // Use text to allow formatting characters
@@ -164,7 +165,7 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
           name="category"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Categoría (Opcional)</FormLabel>
+              <FormLabel className="text-xs sm:text-sm">Categoría (Opcional)</FormLabel>
               <FormControl>
                 <>
                  <Input
@@ -185,10 +186,13 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
             </FormItem>
           )}
         />
-        <Button type="submit" disabled={isSubmitting}>
+         {/* Make button full width on smaller screens */}
+        <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
           {isSubmitting ? 'Agregando...' : 'Agregar Gasto'}
         </Button>
       </form>
     </Form>
   );
 }
+
+    

@@ -10,6 +10,7 @@ import {
   startOfDay,
   endOfDay,
   format, // Import format for better control
+  parse // Import parse for custom formats
 } from 'date-fns';
 // Correct import paths for locales
 import { es } from 'date-fns/locale/es';
@@ -22,21 +23,20 @@ export const safelyParseDate = (date: Date | string | number): Date | null => {
     return date;
   }
   if (typeof date === 'string') {
-    // Try parsing ISO format first
-    const parsedISO = parseISO(date);
-    if (isValid(parsedISO)) {
-      return parsedISO;
+    const parsed = parseISO(date); // Try ISO format first
+    if (isValid(parsed)) {
+      return parsed;
     }
-    // Add other potential string format parsing if needed
+    // Add other potential string format parsing if needed here
   }
-  if (typeof date === 'number') {
+   if (typeof date === 'number') {
       // Assume it's a timestamp if it's a number
       const parsedTimestamp = new Date(date);
       if (isValid(parsedTimestamp)) {
           return parsedTimestamp;
       }
   }
-  console.warn('Fecha inválida encontrada:', date); // Hardcoded Spanish warning
+  // console.warn('Invalid date found or format not recognized:', date); // Optional: warn if needed
   return null;
 };
 
@@ -113,7 +113,7 @@ export const parseCurrency = (formattedValue: string | number | null | undefined
     }
     // Convert to string if it's a number
     const stringValue = String(formattedValue);
-    // Remove non-digit characters
+    // Remove non-digit characters EXCEPT the decimal separator if needed (not needed for COP integer format)
     const numericString = stringValue.replace(/[^\d]/g, '');
     const number = parseInt(numericString, 10);
     return isNaN(number) ? 0 : number; // Return 0 if parsing fails or result is NaN
@@ -128,11 +128,12 @@ export const formatDate = (date: Date | string | number): string => {
     const dateFnsLocale = es;
 
     try {
-        // Use date-fns format with the Spanish locale
-        return format(validDate, 'dd/MM/yyyy HH:mm', { locale: dateFnsLocale });
+        // Consistent format with 'es' locale
+        return format(validDate, 'PPpp', { locale: dateFnsLocale }); // Example: '5 may. 2025, 19:34:00'
     } catch (error) {
-        console.error("Error al formatear fecha:", error, "Fecha de entrada:", date, "Fecha parseada:", validDate);
+        console.error("Error formatting date:", error, "Input:", date, "Parsed:", validDate);
         // Fallback or simpler format if locale causes issues
         return validDate.toLocaleDateString('es-ES') + ' ' + validDate.toLocaleTimeString('es-ES'); // Use Spanish locale for fallback
     }
 }
+

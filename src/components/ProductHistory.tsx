@@ -51,14 +51,17 @@ export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct, def
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Historial por Producto</CardTitle>
+       {/* Adjust padding */}
+      <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">
+        <CardTitle className="text-lg sm:text-xl">Historial por Producto</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+       {/* Adjust padding and select width */}
+      <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
         <div>
-          <Label htmlFor="product-select">Seleccionar Producto:</Label>
+          <Label htmlFor="product-select" className="text-xs sm:text-sm">Seleccionar Producto:</Label>
+           {/* Make select full width on small screens */}
           <Select onValueChange={handleProductChange} value={selectedProduct}>
-            <SelectTrigger id="product-select" className="w-full md:w-[280px] mt-1">
+            <SelectTrigger id="product-select" className="w-full mt-1">
               <SelectValue placeholder="Seleccionar Producto">
                 {selectedProductDisplay}
               </SelectValue>
@@ -73,6 +76,7 @@ export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct, def
           </Select>
         </div>
 
+         {/* Pass down props to ExpenseList which handles its own responsiveness */}
         <ExpenseList
             expenses={filteredExpenses}
             onDeleteExpense={onDeleteExpense}
@@ -88,3 +92,5 @@ export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct, def
     </Card>
   );
 }
+
+    

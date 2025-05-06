@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -6,7 +7,8 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
+   // Allow horizontal scrolling on smaller screens
+  <div className="relative w-full overflow-x-auto">
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
@@ -51,6 +53,7 @@ const TableFooter = React.forwardRef<
 ))
 TableFooter.displayName = "TableFooter"
 
+// Removed potential extra whitespace within TableRow component definition
 const TableRow = React.forwardRef<
   HTMLTableRowElement,
   React.HTMLAttributes<HTMLTableRowElement>
@@ -61,10 +64,11 @@ const TableRow = React.forwardRef<
       "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
       className
     )}
-    {...props}
+    {...props} // Children are passed down here
   />
 ))
 TableRow.displayName = "TableRow"
+
 
 const TableHead = React.forwardRef<
   HTMLTableCellElement,
@@ -73,7 +77,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      "h-10 sm:h-12 px-2 sm:px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 whitespace-nowrap", // Adjusted padding, added whitespace-nowrap
       className
     )}
     {...props}
@@ -87,7 +91,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
-    className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)}
+    className={cn("p-2 sm:p-4 align-middle [&:has([role=checkbox])]:pr-0", className)} // Adjusted padding
     {...props}
   />
 ))
@@ -99,7 +103,7 @@ const TableCaption = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <caption
     ref={ref}
-    className={cn("mt-4 text-sm text-muted-foreground", className)}
+    className={cn("mt-4 text-xs sm:text-sm text-muted-foreground px-2 sm:px-4", className)} // Adjusted padding and text size
     {...props}
   />
 ))
@@ -115,3 +119,5 @@ export {
   TableCell,
   TableCaption,
 }
+
+    

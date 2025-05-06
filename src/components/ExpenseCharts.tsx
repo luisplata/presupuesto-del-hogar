@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { format as formatDateFns } from 'date-fns';
 // Correct import path for locales
-import { es } from 'date-fns/locale';
+import { es } from 'date-fns/locale/es';
 
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -98,7 +98,7 @@ const aggregateStackedExpensesByDay = (
       if (!productKeysMap[productKey]) {
         productKeysMap[productKey] = expense.product.name;
       }
-      
+
       if (!dailyTotals[formattedDate]) {
         dailyTotals[formattedDate] = { total: 0, products: {} };
       }
@@ -216,7 +216,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
             Object.keys(productKeysMap).forEach((productKey) => {
                 // Try to find the full product information from the expenses list
                 const fullProductInfo = expenses.find(expense => expense.product.name === productKey)?.product;
-                
+
                 if (fullProductInfo) {
                   const productExpense = data[productKey] as number || 0;
                     productsWithExpenses.push({
@@ -227,12 +227,12 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                       })
                 }
             })
-            
+
             const filteredProductsWithExpenses = productsWithExpenses.filter(p => p.value > 0).sort((a,b) => b.value - a.value)
-            
+
 
             return (
-                <div className="rounded-lg border bg-background p-2.5 text-sm shadow-lg">
+                <div className="rounded-lg border bg-background p-2.5 text-xs sm:text-sm shadow-lg max-w-[250px] sm:max-w-xs"> {/* Adjusted padding and font size, max-width */}
                     <div className="mb-1.5 font-medium">{label}</div> {/* Date */}
                     <div className="mb-1 border-t pt-1 font-semibold">
                         Total Día: {formatCurrency(data.total)}
@@ -240,14 +240,14 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                     <div className="grid gap-1">
                         {filteredProductsWithExpenses.map((product) => (
                             <div key={product.key} className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 overflow-hidden"> {/* Added overflow hidden */}
                                     <span
                                         className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
                                         style={{ backgroundColor: product.color }}
                                     />
-                                    <span className="text-muted-foreground">{product.name}:</span>
+                                    <span className="text-muted-foreground truncate">{product.name}:</span> {/* Added truncate */}
                                 </div>
-                                <span className="font-semibold">{formatCurrency(product.value)}</span>
+                                <span className="font-semibold whitespace-nowrap">{formatCurrency(product.value)}</span> {/* Added whitespace-nowrap */}
                             </div>
                         ))}
                          {filteredProductsWithExpenses.length === 0 && (
@@ -267,9 +267,9 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
 
         if (!isClient) {
             return (
-                 <div className="mt-4 p-4 rounded-md border bg-card space-y-2 min-h-[350px]">
-                    <Skeleton className="h-6 w-3/4 mb-4" />
-                    <Skeleton className="h-[300px] w-full" />
+                 <div className="mt-4 p-4 rounded-md border bg-card space-y-2 min-h-[250px] sm:min-h-[350px]"> {/* Adjusted min-height */}
+                    <Skeleton className="h-5 sm:h-6 w-3/4 mb-4" />
+                    <Skeleton className="h-[200px] sm:h-[300px] w-full" />
                 </div>
             );
         }
@@ -279,56 +279,58 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                  ? 'Agrega gastos para ver el gráfico.' // Hardcoded Spanish
                  : `No hay gastos en los últimos ${period} días.`; // Hardcoded Spanish
              return (
-                 <div className="mt-4 p-4 rounded-md border bg-card text-center min-h-[350px] flex items-center justify-center">
-                    <p className="text-muted-foreground">{message}</p>
+                 <div className="mt-4 p-4 rounded-md border bg-card text-center min-h-[250px] sm:min-h-[350px] flex items-center justify-center"> {/* Adjusted min-height */}
+                    <p className="text-muted-foreground text-sm sm:text-base">{message}</p> {/* Adjusted font size */}
                  </div>
              );
          }
 
-        return (
-            // Use ChartContainer config for CSS variables, even if not directly mapping lines
-             <ChartContainer config={chartConfig} className="min-h-[350px] w-full mt-4">
-                <ResponsiveContainer width="100%" height={350}>
-                    <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+         return (
+             // Use ChartContainer config for CSS variables, even if not directly mapping lines
+             <ChartContainer config={chartConfig} className="min-h-[250px] sm:min-h-[350px] w-full mt-4"> {/* Adjusted min-height */}
+                <ResponsiveContainer width="100%" height={isClient ? window.innerWidth < 640 ? 250 : 350 : 350}>
+                     <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
                          <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                        <XAxis
-                            dataKey="date"
-                            tickLine={false}
-                            axisLine={false}
-                            tickMargin={8}
-                        />
-                        <YAxis
-                            tickFormatter={(value) => formatCurrency(value)}
-                            tickLine={false}
-                            axisLine={false}
-                            tickMargin={8}
-                            width={80} // Adjust width for currency formatting
-                        />
+                         <XAxis
+                             dataKey="date"
+                             tickLine={false}
+                             axisLine={false}
+                             tickMargin={8}
+                             fontSize={10} // Smaller font size for dates
+                         />
+                         <YAxis
+                             tickFormatter={(value) => formatCurrency(value)}
+                             tickLine={false}
+                             axisLine={false}
+                             tickMargin={8}
+                             width={60} // Reduced width for Y-axis labels
+                             fontSize={10} // Smaller font size for currency
+                         />
                          {/* Use the custom tooltip component */}
-                         <Tooltip 
-                            cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} // Customize cursor appearance
-                            formatter={(value, name, props) => {
-                                // Return value with the name
-                                return [value, props.payload.name];
-                            }}
-                              content={({ active = false, payload = [], label }) => (
-                                  <CustomTooltip
-                                      active={active}
-                                      payload={payload}
-                                      label={label}
-                                      config={chartConfig} productKeysMap={productKeysMap} expenses={expenses} />
-                                  )}
+                         <Tooltip
+                             cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} // Customize cursor appearance
+                             formatter={(value, name, props) => {
+                                 // Return value with the name
+                                 return [value, props.payload.name];
+                             }}
+                             content={({ active = false, payload = [], label }) => (
+                                 <CustomTooltip
+                                     active={active}
+                                     payload={payload}
+                                     label={label}
+                                     config={chartConfig} productKeysMap={productKeysMap} expenses={expenses} />
+                             )}
                          />
 
-                        {/* Single Area for total */}
-                        <Area
-                            type="linear"
-                            dataKey="total"
-                            stroke="none"
-                            fill="var(--color-total)" // Use color defined in chartConfig
-                            fillOpacity={0.4}
-                        />
-                        {/* Single Line for total */}
+                         {/* Single Area for total */}
+                         <Area
+                             type="linear"
+                             dataKey="total"
+                             stroke="none"
+                             fill="var(--color-total)" // Use color defined in chartConfig
+                             fillOpacity={0.4}
+                         />
+                         {/* Single Line for total */}
                          <Line
                              type="linear"
                              dataKey="total"
@@ -336,19 +338,15 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                              strokeWidth={2}
                              dot={false}
                              activeDot={{ // Style the active dot on hover
-                                 r: 6,
+                                 r: 4, // Smaller dot on mobile
                                  fill: 'var(--color-total)',
                                  stroke: 'hsl(var(--background))',
                                  strokeWidth: 2,
-                             }}
+                             }} 
                          />
-
-                        {/* No longer render individual lines/areas per product */}
-                        {/* {productKeys.map((productKey) => ( ... ))} */}
-
-                    </LineChart>
-                </ResponsiveContainer>
-            </ChartContainer>
+                     </LineChart>
+                 </ResponsiveContainer>
+             </ChartContainer>
         );
     };
 
@@ -357,15 +355,16 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
     <Card>
       <CardHeader>
         {/* Updated Title */}
-        <CardTitle>Análisis de Gastos Totales por Día (Gráfico de Línea)</CardTitle>
+        <CardTitle className="text-lg sm:text-xl">Análisis de Gastos Totales por Día</CardTitle> {/* Adjusted title size */}
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="7days" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="7days">Últimos 7 Días</TabsTrigger>
-            <TabsTrigger value="30days">Últimos 30 Días</TabsTrigger>
-            <TabsTrigger value="90days">Últimos 90 Días</TabsTrigger>
-          </TabsList>
+           {/* Adjust TabsList for better mobile wrapping if needed */}
+           <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="7days">7 Días</TabsTrigger> {/* Shortened text */}
+            <TabsTrigger value="30days">30 Días</TabsTrigger> {/* Shortened text */}
+            <TabsTrigger value="90days">90 Días</TabsTrigger> {/* Shortened text */}
+           </TabsList>
           <TabsContent value="7days">
             {renderChart(chartData7Days, productKeys7Days, "7")}
           </TabsContent>
