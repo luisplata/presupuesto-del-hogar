@@ -1,4 +1,3 @@
-
 // components/ExpenseList.tsx
 
 import type { Expense } from '@/types/expense';
@@ -15,7 +14,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/dateUtils';
+// Import safelyParseDate along with other formatters
+import { formatCurrency, formatDate, safelyParseDate } from '@/lib/dateUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -193,7 +193,7 @@ export function ExpenseList({
                           </AlertDialogContent>
                       </AlertDialog>
                   </TableCell>
-              </TableRow> // Ensure no whitespace before or after this tag
+              </TableRow>
             ))}
           </TableBody>
         </Table>
@@ -201,4 +201,3 @@ export function ExpenseList({
     </Card>
   );
 }
-    
