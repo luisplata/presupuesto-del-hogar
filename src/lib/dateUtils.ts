@@ -23,41 +23,20 @@ export const safelyParseDate = (date: Date | string | number): Date | null => {
     return date;
   }
   if (typeof date === 'string') {
-    // 1. Try parsing ISO format first (more robust)
-    const parsedISO = parseISO(date);
-    if (isValid(parsedISO)) {
-      return parsedISO;
+    const parsed = parseISO(date); // Try ISO format first
+    if (isValid(parsed)) {
+      return parsed;
     }
-    // 2. Try parsing the 'dd/MM/yyyy HH:mm' format (common in Excel export/import)
-    try {
-        // Reference date 'new Date()' is needed for parse if only time is provided, but here we have full date/time
-        const parsedCustom = parse(date, 'dd/MM/yyyy HH:mm', new Date(), { locale: es });
-        if (isValid(parsedCustom)) {
-            return parsedCustom;
-        }
-    } catch (e) {
-        // Ignore parsing errors for this format and continue trying others
-    }
-    // 3. Try parsing just the date part 'dd/MM/yyyy' (potential Excel format)
-     try {
-        const parsedDateOnly = parse(date, 'dd/MM/yyyy', new Date(), { locale: es });
-        if (isValid(parsedDateOnly)) {
-            return parsedDateOnly; // Return date at start of day
-        }
-     } catch (e) {
-         // Ignore parsing errors
-     }
-
     // Add other potential string format parsing if needed here
   }
-  if (typeof date === 'number') {
+   if (typeof date === 'number') {
       // Assume it's a timestamp if it's a number
       const parsedTimestamp = new Date(date);
       if (isValid(parsedTimestamp)) {
           return parsedTimestamp;
       }
   }
-  console.warn('Fecha inválida encontrada o formato no reconocido:', date); // Hardcoded Spanish warning
+  // console.warn('Invalid date found or format not recognized:', date); // Optional: warn if needed
   return null;
 };
 
@@ -149,10 +128,10 @@ export const formatDate = (date: Date | string | number): string => {
     const dateFnsLocale = es;
 
     try {
-        // Use date-fns format with the Spanish locale for consistency with export/import
-        return format(validDate, 'dd/MM/yyyy HH:mm', { locale: dateFnsLocale });
+        // Consistent format with 'es' locale
+        return format(validDate, 'PPpp', { locale: dateFnsLocale }); // Example: '5 may. 2025, 19:34:00'
     } catch (error) {
-        console.error("Error al formatear fecha:", error, "Fecha de entrada:", date, "Fecha parseada:", validDate);
+        console.error("Error formatting date:", error, "Input:", date, "Parsed:", validDate);
         // Fallback or simpler format if locale causes issues
         return validDate.toLocaleDateString('es-ES') + ' ' + validDate.toLocaleTimeString('es-ES'); // Use Spanish locale for fallback
     }
