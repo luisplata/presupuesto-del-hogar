@@ -100,7 +100,7 @@ export default function Home() {
          return timeB - timeA;
        })
        .map(exp => ({
-          [excelHeaders.product]: exp.product,
+          [excelHeaders.product]: exp.product.name, // Extract product name
           [excelHeaders.price]: exp.price, // Keep as number
           [excelHeaders.category]: exp.category, // Use the stored category name directly
           [excelHeaders.datetime]: formatDate(exp.timestamp), // Format date for readability (uses default Spanish locale now)
@@ -243,14 +243,16 @@ export default function Home() {
           <title>Control de Gastos</title>
           <meta name="description" content="Registra y analiza tus gastos fácilmente." />
       </Head>
-      <main className="container mx-auto p-4 min-h-screen">
-          <header className="mb-8 text-center relative">
+      {/* Adjust main container padding for responsiveness */}
+      <main className="container mx-auto px-2 sm:px-4 py-4 min-h-screen">
+          <header className="mb-6 md:mb-8 text-center relative">
             {/* Removed LanguageSelector */}
-            <h1 className="text-3xl font-bold text-foreground">Control de Gastos</h1>
-            <p className="text-muted-foreground">Registra y analiza tus gastos fácilmente.</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground">Control de Gastos</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Registra y analiza tus gastos fácilmente.</p>
          </header>
 
         <Tabs defaultValue="control" className="w-full">
+          {/* Make TabsList grid adapt better on smaller screens if needed, but grid-cols-3 is often okay */}
           <TabsList className="grid w-full grid-cols-3 mb-6">
             <TabsTrigger value="control">Control de gastos</TabsTrigger>
             <TabsTrigger value="reporting">Reportería</TabsTrigger>
@@ -259,7 +261,7 @@ export default function Home() {
 
           {/* Tab 1: Control de Gastos */}
           <TabsContent value="control">
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                 <div className="md:col-span-1">
                    <ExpenseForm
                        onAddExpense={handleAddExpense}
@@ -275,7 +277,7 @@ export default function Home() {
 
           {/* Tab 2: Reportería */}
           <TabsContent value="reporting">
-             <div className="space-y-6">
+             <div className="space-y-4 md:space-y-6">
                  <ExpenseCharts expenses={expenses} />
                  <ProductHistory
                      expenses={expenses}
@@ -299,18 +301,23 @@ export default function Home() {
                     <CardTitle>Exportar/Importar Data</CardTitle>
                     <CardDescription>Exporta tus datos de gastos actuales o importa datos desde un archivo Excel.</CardDescription>
                 </CardHeader>
-                <CardContent className="flex flex-col sm:flex-row gap-4">
+                {/* Adjusted button layout for better mobile view */}
+                <CardContent className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                     {/* Export Button */}
-                    {isClient && (
-                       <Button onClick={handleExportToExcel} variant="outline">
+                    {isClient ? (
+                       <Button onClick={handleExportToExcel} variant="outline" className="w-full sm:w-auto">
                           <Download className="mr-2 h-4 w-4" />
                           Exportar a Excel
                        </Button>
+                    ) : (
+                        <Button variant="outline" disabled className="w-full sm:w-auto">
+                            <Download className="mr-2 h-4 w-4" /> Exportar a Excel
+                        </Button>
                     )}
                      {/* Import Button */}
-                    {isClient && (
+                    {isClient ? (
                         <>
-                            <Button onClick={() => fileInputRef.current?.click()} variant="outline">
+                            <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="w-full sm:w-auto">
                                 <Upload className="mr-2 h-4 w-4" />
                                 Importar desde Excel
                             </Button>
@@ -319,15 +326,13 @@ export default function Home() {
                                 ref={fileInputRef}
                                 onChange={handleImportFromExcel}
                                 accept=".xlsx, .xls"
-                                style={{ display: 'none' }} // Hide the default input
+                                className="hidden" // Use className instead of style
                              />
                         </>
-                    )}
-                    {!isClient && (
-                       <>
-                        <Button variant="outline" disabled><Download className="mr-2 h-4 w-4" /> Exportar a Excel</Button>
-                        <Button variant="outline" disabled><Upload className="mr-2 h-4 w-4" /> Importar desde Excel</Button>
-                       </>
+                    ) : (
+                        <Button variant="outline" disabled className="w-full sm:w-auto">
+                            <Upload className="mr-2 h-4 w-4" /> Importar desde Excel
+                        </Button>
                     )}
                 </CardContent>
              </Card>
@@ -339,3 +344,5 @@ export default function Home() {
     </>
   );
 }
+
+    

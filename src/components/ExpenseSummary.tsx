@@ -76,9 +76,9 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
        // Show skeleton if not client or total is still null (calculating)
        if (!isClient || total === null) {
           return (
-                <div className="mt-4 p-4 rounded-md border bg-card space-y-2">
-                    <Skeleton className="h-6 w-3/4" />
-                    <Skeleton className="h-8 w-1/2" />
+                <div className="mt-4 p-3 sm:p-4 rounded-md border bg-card space-y-2"> {/* Adjusted padding */}
+                    <Skeleton className="h-5 sm:h-6 w-3/4" />
+                    <Skeleton className="h-7 sm:h-8 w-1/2" />
                     <Skeleton className="h-4 w-1/4" />
                 </div>
           )
@@ -86,10 +86,10 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
 
        // Render actual content once loaded
        return (
-            <div className="mt-4 p-4 rounded-md border bg-card">
-                <h3 className="text-lg font-semibold">{titleText}</h3>
-                <p className="text-2xl font-bold text-primary">{formatCurrency(total)}</p>
-                <p className="text-sm text-muted-foreground">{count} gasto(s) esta {periodNameText}.</p>
+            <div className="mt-4 p-3 sm:p-4 rounded-md border bg-card"> {/* Adjusted padding */}
+                <h3 className="text-base sm:text-lg font-semibold">{titleText}</h3> {/* Adjusted text size */}
+                <p className="text-xl sm:text-2xl font-bold text-primary">{formatCurrency(total)}</p> {/* Adjusted text size */}
+                <p className="text-xs sm:text-sm text-muted-foreground">{count} gasto(s) esta {periodNameText}.</p> {/* Adjusted text size */}
             </div>
        );
   }
@@ -97,19 +97,20 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
 
   return (
     <Card>
-        <CardHeader>
-          {/* Conditionally render title or skeleton */}
-          <CardTitle>{isClient ? 'Resumen de Gastos' : <Skeleton className="h-6 w-1/2" />}</CardTitle>
+        {/* Adjust CardHeader padding and title size */}
+        <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">
+          <CardTitle className="text-lg sm:text-xl">{isClient ? 'Resumen de Gastos' : <Skeleton className="h-6 w-1/2" />}</CardTitle>
         </CardHeader>
-        <CardContent>
+         {/* Adjust CardContent padding */}
+        <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
              <Tabs defaultValue="week" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    {/* Conditionally render triggers or skeletons */}
+                {/* Ensure TabsList adapts or scrolls on very small screens if needed */}
+                <TabsList className="grid w-full grid-cols-3 h-auto text-xs sm:text-sm"> {/* Adjusted height and text size */}
                     {isClient ? (
                         <>
-                            <TabsTrigger value="week">Semana</TabsTrigger>
-                            <TabsTrigger value="bi-weekly">Quincena</TabsTrigger>
-                            <TabsTrigger value="month">Mes</TabsTrigger>
+                            <TabsTrigger value="week" className="py-1.5 sm:py-2">Semana</TabsTrigger> {/* Adjusted padding */}
+                            <TabsTrigger value="bi-weekly" className="py-1.5 sm:py-2">Quincena</TabsTrigger> {/* Adjusted padding */}
+                            <TabsTrigger value="month" className="py-1.5 sm:py-2">Mes</TabsTrigger> {/* Adjusted padding */}
                         </>
                      ) : (
                          <>
@@ -133,3 +134,5 @@ export function ExpenseSummary({ expenses }: ExpenseSummaryProps) {
     </Card>
   );
 }
+
+    

@@ -53,14 +53,17 @@ export function CategoryHistory({ expenses, onDeleteExpense, onDeleteCategory, d
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Historial por Categoría</CardTitle>
+       {/* Adjust padding */}
+      <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">
+        <CardTitle className="text-lg sm:text-xl">Historial por Categoría</CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+       {/* Adjust padding and select width */}
+      <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
         <div>
-          <Label htmlFor="category-select">Seleccionar Categoría:</Label>
+          <Label htmlFor="category-select" className="text-xs sm:text-sm">Seleccionar Categoría:</Label>
+           {/* Make select full width on small screens */}
           <Select onValueChange={handleCategoryChange} value={selectedCategoryIdentifier}>
-            <SelectTrigger id="category-select" className="w-full md:w-[280px] mt-1">
+            <SelectTrigger id="category-select" className="w-full mt-1">
               <SelectValue placeholder="Seleccionar Categoría">
                   {selectedCategoryDisplay}
               </SelectValue>
@@ -75,6 +78,7 @@ export function CategoryHistory({ expenses, onDeleteExpense, onDeleteCategory, d
           </Select>
         </div>
 
+        {/* Pass down props to ExpenseList which handles its own responsiveness */}
         <ExpenseList
             expenses={filteredExpenses}
             onDeleteExpense={onDeleteExpense}
@@ -90,3 +94,5 @@ export function CategoryHistory({ expenses, onDeleteExpense, onDeleteCategory, d
     </Card>
   );
 }
+
+    
