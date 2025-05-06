@@ -10,6 +10,7 @@ import {
   startOfDay,
   endOfDay,
   format, // Import format for better control
+  parse // Import parse for custom formats
 } from 'date-fns';
 // Correct import paths for locales
 import { es } from 'date-fns/locale/es';
@@ -22,12 +23,32 @@ export const safelyParseDate = (date: Date | string | number): Date | null => {
     return date;
   }
   if (typeof date === 'string') {
-    // Try parsing ISO format first
+    // 1. Try parsing ISO format first (more robust)
     const parsedISO = parseISO(date);
     if (isValid(parsedISO)) {
       return parsedISO;
     }
-    // Add other potential string format parsing if needed
+    // 2. Try parsing the 'dd/MM/yyyy HH:mm' format (common in Excel export/import)
+    try {
+        // Reference date 'new Date()' is needed for parse if only time is provided, but here we have full date/time
+        const parsedCustom = parse(date, 'dd/MM/yyyy HH:mm', new Date(), { locale: es });
+        if (isValid(parsedCustom)) {
+            return parsedCustom;
+        }
+    } catch (e) {
+        // Ignore parsing errors for this format and continue trying others
+    }
+    // 3. Try parsing just the date part 'dd/MM/yyyy' (potential Excel format)
+     try {
+        const parsedDateOnly = parse(date, 'dd/MM/yyyy', new Date(), { locale: es });
+        if (isValid(parsedDateOnly)) {
+            return parsedDateOnly; // Return date at start of day
+        }
+     } catch (e) {
+         // Ignore parsing errors
+     }
+
+    // Add other potential string format parsing if needed here
   }
   if (typeof date === 'number') {
       // Assume it's a timestamp if it's a number
@@ -36,7 +57,7 @@ export const safelyParseDate = (date: Date | string | number): Date | null => {
           return parsedTimestamp;
       }
   }
-  console.warn('Fecha inválida encontrada:', date); // Hardcoded Spanish warning
+  console.warn('Fecha inválida encontrada o formato no reconocido:', date); // Hardcoded Spanish warning
   return null;
 };
 
@@ -113,7 +134,7 @@ export const parseCurrency = (formattedValue: string | number | null | undefined
     }
     // Convert to string if it's a number
     const stringValue = String(formattedValue);
-    // Remove non-digit characters
+    // Remove non-digit characters EXCEPT the decimal separator if needed (not needed for COP integer format)
     const numericString = stringValue.replace(/[^\d]/g, '');
     const number = parseInt(numericString, 10);
     return isNaN(number) ? 0 : number; // Return 0 if parsing fails or result is NaN
@@ -128,7 +149,7 @@ export const formatDate = (date: Date | string | number): string => {
     const dateFnsLocale = es;
 
     try {
-        // Use date-fns format with the Spanish locale
+        // Use date-fns format with the Spanish locale for consistency with export/import
         return format(validDate, 'dd/MM/yyyy HH:mm', { locale: dateFnsLocale });
     } catch (error) {
         console.error("Error al formatear fecha:", error, "Fecha de entrada:", date, "Fecha parseada:", validDate);
@@ -136,3 +157,4 @@ export const formatDate = (date: Date | string | number): string => {
         return validDate.toLocaleDateString('es-ES') + ' ' + validDate.toLocaleTimeString('es-ES'); // Use Spanish locale for fallback
     }
 }
+
