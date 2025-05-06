@@ -1,7 +1,14 @@
+export type Product = {
+  name: string;
+  value: number;
+  color: string;
+};
+
 export type Expense = {
   id: string;
-  product: string;
+  product: Product;
   price: number;
-  category: string; // Added category field
+  category: string;
   timestamp: Date;
 };
+

@@ -95,7 +95,11 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
       await new Promise(resolve => setTimeout(resolve, 100)); // Simulate delay
 
       onAddExpense({
-        product: values.product,
+        product: {
+          name: values.product,
+          color: "",
+          value: 0
+        },
         price: values.price,
         category: categoryToSubmit, // Submit the key or the entered category
       });
