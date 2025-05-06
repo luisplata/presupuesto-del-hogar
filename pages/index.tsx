@@ -3,30 +3,26 @@ import { useState, useEffect, useRef } from 'react';
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ProductHistory } from '@/components/ProductHistory';
-import { CategoryHistory } from '@/components/CategoryHistory'; // Import CategoryHistory
-import { ExpenseCharts } from '@/components/ExpenseCharts'; // Import the charts component
+import { CategoryHistory } from '@/components/CategoryHistory';
+import { ExpenseCharts } from '@/components/ExpenseCharts';
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
 import { safelyParseDate } from '@/lib/dateUtils'; // Import formatters and safelyParseDate
 
-import Head from 'next/head'; // Import Head for page-specific metadata
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"; // Import Tabs components
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Import Card components
-import { useToast } from '@/hooks/use-toast'; // Import useToast
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton for loading state
-// Removed unused imports for Excel functionality:
-// import * as XLSX from 'xlsx';
-// import { saveAs } from 'file-saver';
-// import { Button } from '@/components/ui/button';
-// import { Upload, Download } from 'lucide-react';
+import Head from 'next/head';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
+import { Upload, Download } from 'lucide-react';
+import Papa from 'papaparse'; // For CSV parsing/unparsing
+import { saveAs } from 'file-saver'; // For triggering download
 
 
 const DEFAULT_CATEGORY_KEY = 'no definido'; // Key for the default category (now hardcoded Spanish)
 export default function Home() {
-
-
-
 
   const { toast } = useToast(); // Use toast for feedback
 
@@ -35,8 +31,7 @@ export default function Home() {
 
   // Client-side state to prevent hydration mismatch for export/import buttons
   const [isClient, setIsClient] = useState(false);
-  // Removed unused ref:
-  // const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for file input
 
   useEffect(() => {
       setIsClient(true);
@@ -86,9 +81,135 @@ export default function Home() {
        }
    };
 
-  // Removed handleExport function
-  // Removed handleImportClick function
-  // Removed handleFileChange function
+   const handleExport = () => {
+      if (!isClient) return; // Ensure this runs only on client
+
+      const dataToExport = expenses.map(exp => ({
+          Producto: exp.product.name,
+          Precio: exp.price,
+          Categoria: exp.category,
+          Timestamp: exp.timestamp instanceof Date ? exp.timestamp.toISOString() : new Date(exp.timestamp).toISOString(), // Ensure ISO format
+      }));
+
+      const csv = Papa.unparse(dataToExport, { header: true });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      saveAs(blob, 'gastos.csv');
+
+      toast({
+          title: "Exportación Completa",
+          description: "Los datos de gastos se han exportado a gastos.csv.",
+      });
+   };
+
+   const handleImportClick = () => {
+       if (!isClient || !fileInputRef.current) return; // Ensure this runs only on client
+       fileInputRef.current.click(); // Trigger file input
+   };
+
+   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+       if (!isClient || !event.target.files || event.target.files.length === 0) {
+           return;
+       }
+
+       const file = event.target.files[0];
+       const reader = new FileReader();
+
+       reader.onload = (e) => {
+           const content = e.target?.result;
+           if (typeof content === 'string') {
+               try {
+                   const result = Papa.parse<any>(content, { header: true, skipEmptyLines: true });
+                   const importedExpenses: Expense[] = [];
+                   const importedCategories = new Set<string>(categories); // Start with existing categories
+                   let errorsFound = 0;
+
+                   if (result.errors.length > 0) {
+                       result.errors.forEach(err => console.error('CSV Parsing Error:', err));
+                       toast({
+                           title: "Error de Formato CSV",
+                           description: `Se encontraron ${result.errors.length} errores al leer el archivo. Verifica el formato.`,
+                           variant: "destructive",
+                       });
+                       // Optionally stop processing if errors are critical
+                       // return;
+                   }
+
+
+                   result.data.forEach((row, index) => {
+                       const productName = row.Producto?.trim();
+                       const priceStr = row.Precio?.trim();
+                       const categoryName = row.Categoria?.trim() || DEFAULT_CATEGORY_KEY; // Default if empty
+                       const timestampStr = row.Timestamp?.trim();
+
+                       const price = parseFloat(priceStr);
+                       const timestamp = safelyParseDate(timestampStr); // Use safe parser
+
+
+                       if (!productName || isNaN(price) || price <= 0 || !timestamp) {
+                            console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${productName}, Precio: ${priceStr}, Timestamp: ${timestampStr})`);
+                            errorsFound++;
+                            return; // Skip invalid rows
+                       }
+
+                       const newExpense: Expense = {
+                           id: uuidv4(),
+                           product: { name: productName, value: 0, color: '' }, // Minimal product info
+                           price: price,
+                           category: categoryName,
+                           timestamp: timestamp,
+                       };
+                       importedExpenses.push(newExpense);
+
+                       // Add new category if it's valid and not the default
+                       if (categoryName !== DEFAULT_CATEGORY_KEY && categoryName) {
+                           importedCategories.add(categoryName);
+                       }
+                   });
+
+                   if (importedExpenses.length > 0) {
+                       setExpenses(prevExpenses => [...prevExpenses, ...importedExpenses].sort((a, b) => {
+                           const timeA = safelyParseDate(a.timestamp)?.getTime() ?? 0;
+                           const timeB = safelyParseDate(b.timestamp)?.getTime() ?? 0;
+                           return timeB - timeA;
+                       }));
+                       setCategories(Array.from(importedCategories).sort()); // Update categories
+                   }
+
+                   toast({
+                       title: "Importación Completa",
+                       description: `${importedExpenses.length} gastos importados. ${errorsFound > 0 ? `${errorsFound} filas omitidas por datos inválidos.` : ''}`,
+                   });
+
+               } catch (error) {
+                   console.error("Error al importar CSV:", error);
+                   toast({
+                       title: "Error de Importación",
+                       description: "No se pudo procesar el archivo CSV.",
+                       variant: "destructive",
+                   });
+               } finally {
+                  // Reset file input to allow importing the same file again if needed
+                   if (fileInputRef.current) {
+                     fileInputRef.current.value = '';
+                   }
+               }
+           }
+       };
+
+       reader.onerror = (error) => {
+            console.error("Error al leer archivo:", error);
+            toast({
+                title: "Error de Lectura",
+                description: "No se pudo leer el archivo seleccionado.",
+                variant: "destructive",
+            });
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
+       }
+
+       reader.readAsText(file); // Read file as text
+   };
 
 
   return (
@@ -152,27 +273,26 @@ export default function Home() {
           <TabsContent value="data">
              <Card>
                 <CardHeader>
-                    <CardTitle>Exportar/Importar Data</CardTitle>
-                    <CardDescription>Funcionalidad de Exportar/Importar deshabilitada temporalmente.</CardDescription> {/* Updated description */}
+                    <CardTitle>Exportar/Importar Data (CSV)</CardTitle>
+                    <CardDescription>Exporta tus gastos a un archivo CSV o importa desde uno existente.</CardDescription>
                 </CardHeader>
 
                  <CardContent className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                     {/* Removed Export and Import buttons and file input */}
-                     {/* <input
+                     <input
                          type="file"
                          ref={fileInputRef}
                          onChange={handleFileChange}
-                         accept=".xlsx, .xls"
+                         accept=".csv" // Accept CSV files
                          style={{ display: 'none' }} // Hide the actual file input
-                         id="import-excel-input"
+                         id="import-csv-input"
                      />
                      {isClient ? (
                          <>
                              <Button onClick={handleExport} variant="outline" className="w-full sm:w-auto">
-                                 <Download className="mr-2 h-4 w-4" /> Exportar a Excel
+                                 <Download className="mr-2 h-4 w-4" /> Exportar a CSV
                              </Button>
                              <Button onClick={handleImportClick} variant="outline" className="w-full sm:w-auto">
-                                 <Upload className="mr-2 h-4 w-4" /> Importar desde Excel
+                                 <Upload className="mr-2 h-4 w-4" /> Importar desde CSV
                              </Button>
                          </>
                      ) : (
@@ -180,8 +300,7 @@ export default function Home() {
                              <Skeleton className="h-10 w-full sm:w-auto" />
                              <Skeleton className="h-10 w-full sm:w-auto" />
                          </>
-                     )} */}
-                      <p className="text-muted-foreground text-sm">La importación y exportación de Excel se restaurará pronto.</p>
+                     )}
                  </CardContent>
              </Card>
           </TabsContent>
