@@ -72,7 +72,7 @@ export default function Home() {
   };
 
    const handleDeleteProduct = (productNameToDelete: string) => {
-     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product !== productNameToDelete));
+     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product.name !== productNameToDelete));
    };
 
    const handleDeleteCategory = (categoryIdentifierToDelete: string) => {
@@ -178,7 +178,11 @@ export default function Home() {
 
             const newExpense: Expense = {
                 id: uuidv4(),
-                product,
+                product: {
+                   name: product,
+                   color: "", // Default color (empty string)
+                   value: 0 // Default value (0)
+                },
                 price,
                 category: category || DEFAULT_CATEGORY_KEY,
                 timestamp,

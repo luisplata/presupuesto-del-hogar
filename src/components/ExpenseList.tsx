@@ -150,7 +150,7 @@ export function ExpenseList({
               })
               .map((expense) => (
               <TableRow key={expense.id}>
-                  <TableCell className="font-medium">{expense.product}</TableCell>
+                  <TableCell className="font-medium">{expense.product.name}</TableCell>
                   <TableCell>{formatCurrency(expense.price)}</TableCell>
                   <TableCell>
                       <Badge variant={expense.category === defaultCategoryKey ? 'secondary' : 'outline'}>
@@ -170,7 +170,7 @@ export function ExpenseList({
                               <AlertDialogHeader>
                                   <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                      Esta acción no se puede deshacer. Esto eliminará permanentemente el gasto "{expense.product}" con precio {formatCurrency(expense.price)}.
+                                      Esta acción no se puede deshacer. Esto eliminará permanentemente el gasto "{expense.product.name}" con precio {formatCurrency(expense.price)}.
                                   </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>

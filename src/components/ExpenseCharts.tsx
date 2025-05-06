@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { format as formatDateFns } from 'date-fns';
 // Correct import path for locales
-import { es } from 'date-fns/locale/es';
+import { es } from 'date-fns/locale';
 
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -31,6 +31,12 @@ interface DailyProductExpense {
     [key: string]: number | string; // Dynamic properties for each product's expense
 }
 
+interface ProductWithExpenses extends Product {
+    key: string;
+    value: number;
+    color: string;
+}
+
 // Define the type for the data returned by the aggregation function
 interface AggregatedExpenses {
     data: DailyProductExpense[];
@@ -39,6 +45,7 @@ interface AggregatedExpenses {
 
 
 // Use the actual Expense type
+import { Product } from '@/types/expense';
 import type { Expense } from '@/types/expense';
 
 interface ExpenseChartsProps {
@@ -85,13 +92,13 @@ const aggregateStackedExpensesByDay = (
 
         if (expenseDate >= cutoffDate && expenseDate <= today) {
       const formattedDate = formatDateFns(expenseDate, 'yyyy-MM-dd');
-      const productKey = expense.product; // Use product name as the key
+      const productKey = expense.product.name; // Use product name as the key
 
       // Store original product name
       if (!productKeysMap[productKey]) {
-        productKeysMap[productKey] = expense.product;
+        productKeysMap[productKey] = expense.product.name;
       }
-
+      
       if (!dailyTotals[formattedDate]) {
         dailyTotals[formattedDate] = { total: 0, products: {} };
       }
@@ -197,20 +204,32 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
     }, [expenses]); // Recalculate when expenses change
 
     // Custom Tooltip Content Component
-    const CustomTooltip = ({ active, payload, label, config, productKeysMap }: any) => {
-        if (active && payload && payload.length) {
+    const CustomTooltip = ({ active, payload, label, config, productKeysMap, expenses }: { active: boolean; payload: any[]; label: string; config: ChartConfig; productKeysMap: { [key: string]: string }; expenses: Expense[]; }) => {
+      if (active && payload && payload.length) {
+
+
             const data = payload[0].payload as DailyProductExpense; // The full data for the hovered day
 
-            // Filter product keys with expenses > 0 for this day
-            const productsWithExpenses = Object.entries(productKeysMap)
-                .map(([key, name]) => ({
-                    key,
-                    name,
-                    value: data[key] as number,
-                    color: config[key]?.color || '#ccc' // Fallback color
-                }))
-                .filter(p => p.value > 0 && typeof p.name === "string")
-                .sort((a,b) => b.value - a.value); // Sort by value descending
+            const productsWithExpenses:ProductWithExpenses[] = [];
+
+             // Iterate through each unique product found in the expenses
+            Object.keys(productKeysMap).forEach((productKey) => {
+                // Try to find the full product information from the expenses list
+                const fullProductInfo = expenses.find(expense => expense.product.name === productKey)?.product;
+                
+                if (fullProductInfo) {
+                  const productExpense = data[productKey] as number || 0;
+                    productsWithExpenses.push({
+                        ...fullProductInfo,
+                        key: productKey, // Use the product key
+                        value: productExpense,
+                        color: config[productKey]?.color || '#ccc'
+                      })
+                }
+            })
+            
+            const filteredProductsWithExpenses = productsWithExpenses.filter(p => p.value > 0).sort((a,b) => b.value - a.value)
+            
 
             return (
                 <div className="rounded-lg border bg-background p-2.5 text-sm shadow-lg">
@@ -219,7 +238,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                         Total Día: {formatCurrency(data.total)}
                     </div>
                     <div className="grid gap-1">
-                        {productsWithExpenses.map((product) => (
+                        {filteredProductsWithExpenses.map((product) => (
                             <div key={product.key} className="flex items-center justify-between gap-2">
                                 <div className="flex items-center gap-1.5">
                                     <span
@@ -231,7 +250,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                 <span className="font-semibold">{formatCurrency(product.value)}</span>
                             </div>
                         ))}
-                         {productsWithExpenses.length === 0 && (
+                         {filteredProductsWithExpenses.length === 0 && (
                              <div className="text-muted-foreground text-xs">Sin gastos registrados para este día.</div>
                          )}
                     </div>
@@ -246,10 +265,9 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
         const chartConfig = useMemo(() => generateChartConfig(productKeysMap), [productKeysMap]);
         // Removed productKeys constant as it's not directly used for rendering lines anymore
 
-
         if (!isClient) {
             return (
-                <div className="mt-4 p-4 rounded-md border bg-card space-y-2 min-h-[350px]">
+                 <div className="mt-4 p-4 rounded-md border bg-card space-y-2 min-h-[350px]">
                     <Skeleton className="h-6 w-3/4 mb-4" />
                     <Skeleton className="h-[300px] w-full" />
                 </div>
@@ -272,7 +290,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
              <ChartContainer config={chartConfig} className="min-h-[350px] w-full mt-4">
                 <ResponsiveContainer width="100%" height={350}>
                     <LineChart data={data} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-                        <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
                         <XAxis
                             dataKey="date"
                             tickLine={false}
@@ -287,9 +305,19 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                             width={80} // Adjust width for currency formatting
                         />
                          {/* Use the custom tooltip component */}
-                         <Tooltip
-                             cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} // Customize cursor appearance
-                             content={<CustomTooltip config={chartConfig} productKeysMap={productKeysMap} />}
+                         <Tooltip 
+                            cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} // Customize cursor appearance
+                            formatter={(value, name, props) => {
+                                // Return value with the name
+                                return [value, props.payload.name];
+                            }}
+                              content={({ active = false, payload = [], label }) => (
+                                  <CustomTooltip
+                                      active={active}
+                                      payload={payload}
+                                      label={label}
+                                      config={chartConfig} productKeysMap={productKeysMap} expenses={expenses} />
+                                  )}
                          />
 
                         {/* Single Area for total */}

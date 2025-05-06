@@ -18,7 +18,7 @@ interface ProductHistoryProps {
 
 // Helper to get unique products including 'all'
 const getUniqueProducts = (expenses: Expense[]): string[] => {
-  const products = new Set(expenses.map(e => e.product));
+  const products = new Set(expenses.map(e => e.product.name));
   // Ensure 'all' is first, then sort the rest
   return ['all', ...Array.from(products).sort()];
 };
@@ -28,7 +28,7 @@ const filterExpenses = (expenses: Expense[], selectedProduct: string): Expense[]
   if (selectedProduct === 'all') {
     return expenses;
   }
-  return expenses.filter(expense => expense.product === selectedProduct);
+  return expenses.filter(expense => expense.product.name === selectedProduct);
 };
 
 export function ProductHistory({ expenses, onDeleteExpense, onDeleteProduct, defaultCategoryKey }: ProductHistoryProps) {
