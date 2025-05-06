@@ -151,9 +151,10 @@ export function ExpenseList({
           <TableBody>
             {expenses
               .sort((a, b) => {
-                const timeA = a.timestamp instanceof Date ? a.timestamp.getTime() : new Date(a.timestamp).getTime();
-                const timeB = b.timestamp instanceof Date ? b.timestamp.getTime() : new Date(b.timestamp).getTime();
-                return timeB - timeA;
+                // Safely parse dates before comparison
+                const timeA = safelyParseDate(a.timestamp)?.getTime() ?? 0;
+                const timeB = safelyParseDate(b.timestamp)?.getTime() ?? 0;
+                return timeB - timeA; // Sort descending (newest first)
               })
               .map((expense) => (
               <TableRow key={expense.id}>
@@ -192,7 +193,7 @@ export function ExpenseList({
                           </AlertDialogContent>
                       </AlertDialog>
                   </TableCell>
-              </TableRow>
+              </TableRow> // Ensure no whitespace before or after this tag
             ))}
           </TableBody>
         </Table>
@@ -200,5 +201,4 @@ export function ExpenseList({
     </Card>
   );
 }
-
     
