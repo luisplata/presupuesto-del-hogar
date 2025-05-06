@@ -285,52 +285,52 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
              );
          }
 
-        return (
-            // Use ChartContainer config for CSS variables, even if not directly mapping lines
+         return (
+             // Use ChartContainer config for CSS variables, even if not directly mapping lines
              <ChartContainer config={chartConfig} className="min-h-[250px] sm:min-h-[350px] w-full mt-4"> {/* Adjusted min-height */}
-                <ResponsiveContainer width="100%" height={isClient ? window.innerWidth < 640 ? 250 : 350 : 350}> {/* Dynamic height */}
-                    <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}> {/* Adjusted margins */}
+                <ResponsiveContainer width="100%" height={isClient ? window.innerWidth < 640 ? 250 : 350 : 350}>
+                     <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
                          <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                        <XAxis
-                            dataKey="date"
-                            tickLine={false}
-                            axisLine={false}
-                            tickMargin={8}
-                            fontSize={10} // Smaller font size for dates
-                        />
-                        <YAxis
-                            tickFormatter={(value) => formatCurrency(value)}
-                            tickLine={false}
-                            axisLine={false}
-                            tickMargin={8}
-                            width={60} // Reduced width for Y-axis labels
-                            fontSize={10} // Smaller font size for currency
-                        />
+                         <XAxis
+                             dataKey="date"
+                             tickLine={false}
+                             axisLine={false}
+                             tickMargin={8}
+                             fontSize={10} // Smaller font size for dates
+                         />
+                         <YAxis
+                             tickFormatter={(value) => formatCurrency(value)}
+                             tickLine={false}
+                             axisLine={false}
+                             tickMargin={8}
+                             width={60} // Reduced width for Y-axis labels
+                             fontSize={10} // Smaller font size for currency
+                         />
                          {/* Use the custom tooltip component */}
                          <Tooltip
-                            cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} // Customize cursor appearance
-                            formatter={(value, name, props) => {
-                                // Return value with the name
-                                return [value, props.payload.name];
-                            }}
-                              content={({ active = false, payload = [], label }) => (
-                                  <CustomTooltip
-                                      active={active}
-                                      payload={payload}
-                                      label={label}
-                                      config={chartConfig} productKeysMap={productKeysMap} expenses={expenses} />
-                                  )}
+                             cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} // Customize cursor appearance
+                             formatter={(value, name, props) => {
+                                 // Return value with the name
+                                 return [value, props.payload.name];
+                             }}
+                             content={({ active = false, payload = [], label }) => (
+                                 <CustomTooltip
+                                     active={active}
+                                     payload={payload}
+                                     label={label}
+                                     config={chartConfig} productKeysMap={productKeysMap} expenses={expenses} />
+                             )}
                          />
 
-                        {/* Single Area for total */}
-                        <Area
-                            type="linear"
-                            dataKey="total"
-                            stroke="none"
-                            fill="var(--color-total)" // Use color defined in chartConfig
-                            fillOpacity={0.4}
-                        />
-                        {/* Single Line for total */}
+                         {/* Single Area for total */}
+                         <Area
+                             type="linear"
+                             dataKey="total"
+                             stroke="none"
+                             fill="var(--color-total)" // Use color defined in chartConfig
+                             fillOpacity={0.4}
+                         />
+                         {/* Single Line for total */}
                          <Line
                              type="linear"
                              dataKey="total"
@@ -342,15 +342,11 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                                  fill: 'var(--color-total)',
                                  stroke: 'hsl(var(--background))',
                                  strokeWidth: 2,
-                             }}
+                             }} 
                          />
-
-                        {/* No longer render individual lines/areas per product */}
-                        {/* {productKeys.map((productKey) => ( ... ))} */}
-
-                    </LineChart>
-                </ResponsiveContainer>
-            </ChartContainer>
+                     </LineChart>
+                 </ResponsiveContainer>
+             </ChartContainer>
         );
     };
 
