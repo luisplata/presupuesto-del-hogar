@@ -28,6 +28,19 @@ jobs:
           npx cap init "My App" "com.example.myapp" --web-dir=build
           npx cap add android
 
+      - name: Verificar que build/ existe
+        run: |
+          if [ ! -d build ]; then
+            echo "❌ No existe el directorio build/"
+            exit 1
+          fi
+          if [ ! -f build/index.html ]; then
+            echo "❌ No se encuentra index.html en build/"
+            exit 1
+          fi
+          ls
+
+
 
       - name: Sync Capacitor project
         run: npx cap sync android
