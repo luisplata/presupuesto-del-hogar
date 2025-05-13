@@ -24,9 +24,10 @@ jobs:
 
       - name: Install Capacitor & Android dependencies
         run: |
-          npm install @capacitor/cli
+          npm install @capacitor/cli @capacitor/android
           npx cap init "My App" "com.example.myapp" --web-dir=build
           npx cap add android
+
 
       - name: Sync Capacitor project
         run: npx cap sync android
