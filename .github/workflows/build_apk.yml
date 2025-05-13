@@ -55,8 +55,9 @@ jobs:
 
       - name: Build APK forcing Java 17
         run: |
+          export JAVA_HOME=$JAVA_HOME_17_X64
           cd android
-          ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME_17_X64
+          ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME
 
       - name: Subir APK como artefacto
         uses: actions/upload-artifact@v4
