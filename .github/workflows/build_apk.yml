@@ -25,25 +25,32 @@ jobs:
       - name: Install Capacitor & Android dependencies
         run: |
           npm install @capacitor/cli @capacitor/android
-          npx cap init "My App" "com.example.myapp" --web-dir=build
-          npx cap add android
-
-      - name: Verificar que build/ existe
+      
+      - name: Build static Next.js app
+        run: |
+          npx next build
+          npx next export
+      
+      - name: Verificar que out/ existe
         run: |
           ls
-          if [ ! -d build ]; then
-            echo "❌ No existe el directorio build/"
+          if [ ! -d out ]; then
+            echo "❌ No existe el directorio out/"
             exit 1
           fi
-          if [ ! -f build/index.html ]; then
-            echo "❌ No se encuentra index.html en build/"
+          if [ ! -f out/index.html ]; then
+            echo "❌ No se encuentra index.html en out/"
             exit 1
           fi
-
-
-
+      
+      - name: Init Capacitor with Next.js output
+        run: |
+          npx cap init "My App" "com.example.myapp" --web-dir=out
+          npx cap add android
+      
       - name: Sync Capacitor project
         run: npx cap sync android
+
 
       - name: Set up JDK 17 (required for Android)
         uses: actions/setup-java@v4
