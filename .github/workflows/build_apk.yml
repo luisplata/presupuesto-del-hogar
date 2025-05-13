@@ -30,6 +30,7 @@ jobs:
 
       - name: Verificar que build/ existe
         run: |
+          ls
           if [ ! -d build ]; then
             echo "❌ No existe el directorio build/"
             exit 1
@@ -38,7 +39,6 @@ jobs:
             echo "❌ No se encuentra index.html en build/"
             exit 1
           fi
-          ls
 
 
 
