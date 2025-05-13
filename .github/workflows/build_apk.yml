@@ -33,13 +33,13 @@ jobs:
             echo "❌ No se encuentra index.html en out/"
             exit 1
           fi
-
+          
       - name: Instalar Capacitor y plataforma Android
         run: |
           npm install @capacitor/cli @capacitor/android
           npx cap init "My App" "com.example.myapp" --web-dir=out
           npx cap add android
-
+          
       - name: Sync Capacitor
         run: npx cap sync android
 
@@ -49,12 +49,14 @@ jobs:
           distribution: 'temurin'
           java-version: 17
 
+      - name: Forzar el uso de Java 17 en Gradle
+        run: |
+          echo "org.gradle.java.home=$JAVA_HOME_17_X64" >> android/gradle.properties
 
       - name: Build APK forcing Java 17
         run: |
           cd android
           ./gradlew assembleRelease -Dorg.gradle.java.home=$JAVA_HOME_17_X64
-
 
       - name: Subir APK como artefacto
         uses: actions/upload-artifact@v4
