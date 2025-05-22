@@ -6,6 +6,7 @@ import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ExpenseList } from '@/components/ExpenseList';
 import { ExpenseCharts } from '@/components/ExpenseCharts';
 import { CategoryCharts } from '@/components/CategoryCharts';
+import { EditExpenseDialog } from '@/components/EditExpenseDialog'; // Importar el nuevo diálogo
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
@@ -41,6 +42,9 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
 
+  // State for editing expense
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+
   // Filters for Reporting Tab
   const [selectedProductFilter, setSelectedProductFilter] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
@@ -59,7 +63,6 @@ export default function Home() {
     }
   }, [categories, setCategories, isClient]);
 
-  // Effect to update date filters when quick range changes
   useEffect(() => {
     if (!isClient) return;
     const today = new Date();
@@ -79,9 +82,6 @@ export default function Home() {
       newStart = startOfDay(subDays(today, 89));
       newEnd = endOfDay(today);
     } else if (selectedQuickRange === 'custom') {
-      // When 'custom' is selected, we don't automatically change dates here.
-      // The user will use the date pickers.
-      // If date pickers were used to set 'custom', their values are preserved.
       return;
     }
     setStartDateFilter(newStart);
@@ -113,6 +113,43 @@ export default function Home() {
   const handleDeleteExpense = (idToDelete: string) => {
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.id !== idToDelete));
   };
+
+  const handleEditExpense = (expenseToEdit: Expense) => {
+    setEditingExpense(expenseToEdit);
+  };
+
+  const handleSaveEditedExpense = (updatedExpenseData: Expense) => {
+    const categoryToUpdate = updatedExpenseData.category?.trim() ? updatedExpenseData.category.trim() : DEFAULT_CATEGORY_KEY;
+    const finalUpdatedExpense = {
+      ...updatedExpenseData,
+      category: categoryToUpdate,
+    };
+
+    setExpenses(prevExpenses =>
+      prevExpenses.map(exp =>
+        exp.id === finalUpdatedExpense.id ? finalUpdatedExpense : exp
+      ).sort((a, b) => {
+        const timeA = safelyParseDate(a.timestamp)?.getTime() ?? 0;
+        const timeB = safelyParseDate(b.timestamp)?.getTime() ?? 0;
+        return timeB - timeA;
+      })
+    );
+
+    if (categoryToUpdate !== DEFAULT_CATEGORY_KEY && !categories.includes(categoryToUpdate)) {
+      setCategories(prevCategories => [...prevCategories, categoryToUpdate].sort());
+    }
+
+    setEditingExpense(null);
+    toast({
+      title: 'Gasto Actualizado',
+      description: `El gasto "${finalUpdatedExpense.product.name}" ha sido actualizado.`,
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingExpense(null);
+  };
+
 
   const handleDeleteProduct = (productNameToDelete: string) => {
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product.name !== productNameToDelete));
@@ -194,18 +231,15 @@ export default function Home() {
             const categoryName = row.Categoria?.trim() || DEFAULT_CATEGORY_KEY;
             const timestampStr = row.Timestamp?.trim();
             const price = parseFloat(priceStr);
-            let timestamp = safelyParseDate(timestampStr); // ISO format preferred
+            let timestamp = safelyParseDate(timestampStr);
 
-            // Attempt to parse "dd/MM/yyyy HH:mm" if ISO fails
             if (!timestamp && typeof timestampStr === 'string') {
                 const parts = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
                 if (parts) {
-                    // parts[0] is full match, 1 is day, 2 is month, 3 is year, 4 is hour, 5 is minute
                     const isoAttempt = `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`;
                     timestamp = safelyParseDate(isoAttempt);
                 }
             }
-             // Attempt to parse "dd/MM/yyyy HH:mm:ss" if previous attempts fail
             if (!timestamp && typeof timestampStr === 'string') {
                 const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
                 if (partsWithSeconds) {
@@ -213,7 +247,6 @@ export default function Home() {
                     timestamp = safelyParseDate(isoAttemptWithSeconds);
                 }
             }
-
 
             if (!productName || isNaN(price) || price <= 0 || !timestamp) {
               console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${productName}, Precio: ${priceStr}, Timestamp: ${timestampStr}, Fecha Parseada: ${timestamp})`);
@@ -295,7 +328,6 @@ export default function Home() {
       if (!expenseTimestamp) return false;
 
       let dateMatch = true;
-      // For date matching, ensure startOfDay and endOfDay are used for comparison if filters are set
       const effectiveStartDate = startDateFilter ? startOfDay(startDateFilter) : null;
       const effectiveEndDate = endDateFilter ? endOfDay(endDateFilter) : null;
       
@@ -319,14 +351,11 @@ export default function Home() {
   const handleClearFilters = () => {
     setSelectedProductFilter('all');
     setSelectedCategoryFilter('all');
-    setSelectedQuickRange('allTime'); // This will trigger the useEffect to set dates to null
+    setSelectedQuickRange('allTime'); 
   };
   
   const handleDateSelect = (dateSetter: (date: Date | null) => void, date: Date | null) => {
     dateSetter(date);
-    // If both dates become null or a specific date is set, it's custom.
-    // If one is null and other is set, it's also custom.
-    // The only time it's not custom is when selectedQuickRange sets both or sets both to null.
     setSelectedQuickRange('custom');
   };
 
@@ -339,7 +368,6 @@ export default function Home() {
   if (isClient) {
     const isProductFiltered = selectedProductFilter !== 'all';
     const isCategoryFiltered = selectedCategoryFilter !== 'all';
-    // A group is active if only one of product/category is filtered, and no date filters are set (allTime or custom with null dates)
     const noDateFiltersActive = !startDateFilter && !endDateFilter;
 
     if (isProductFiltered && !isCategoryFiltered && noDateFiltersActive) {
@@ -588,8 +616,8 @@ export default function Home() {
               
               <ExpenseCharts 
                 expenses={filteredExpenses} 
-                startDate={graphViewStartDate} // Always pass valid dates
-                endDate={graphViewEndDate}     // Always pass valid dates
+                startDate={graphViewStartDate} 
+                endDate={graphViewEndDate}     
               />
               <CategoryCharts 
                 expenses={filteredExpenses} 
@@ -606,6 +634,7 @@ export default function Home() {
                     <ExpenseList
                       expenses={filteredExpenses}
                       onDeleteExpense={handleDeleteExpense}
+                      onEditExpense={handleEditExpense} // Pasar la nueva función
                       groupName={activeGroupName}
                       onDeleteGroup={onDeleteActiveGroup}
                       groupTypeLabel={activeGroupType}
@@ -654,8 +683,17 @@ export default function Home() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {editingExpense && isClient && (
+          <EditExpenseDialog
+            expense={editingExpense}
+            onSave={handleSaveEditedExpense}
+            onCancel={handleCancelEdit}
+            categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)}
+            defaultCategoryKey={DEFAULT_CATEGORY_KEY}
+          />
+        )}
       </main>
     </>
   );
 }
-

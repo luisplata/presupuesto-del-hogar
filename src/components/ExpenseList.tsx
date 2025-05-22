@@ -6,15 +6,13 @@ import React from 'react';
 import {
   Table,
   TableBody,
-  TableCaption, // Keep if you decide to use it elsewhere, otherwise can remove
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Removed CardDescription if not used
 import { Button } from '@/components/ui/button';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Pencil } from 'lucide-react'; // Importar Pencil icon
 import { formatCurrency, formatDate, safelyParseDate } from '@/lib/dateUtils';
 import {
   AlertDialog,
@@ -33,9 +31,8 @@ import { Badge } from '@/components/ui/badge';
 
 interface ExpenseListProps {
   expenses: Expense[];
-  // title?: string; // Title will be handled by parent CardHeader
-  // caption?: string; // Caption will be handled by parent CardHeader CardDescription
   onDeleteExpense: (id: string) => void;
+  onEditExpense: (expense: Expense) => void; // Nueva prop para editar
   groupName?: string;        
   groupDisplayName?: string; 
   onDeleteGroup?: (identifier: string) => void; 
@@ -46,6 +43,7 @@ interface ExpenseListProps {
 export function ExpenseList({
   expenses,
   onDeleteExpense,
+  onEditExpense, // Recibir la nueva prop
   groupName, 
   groupDisplayName, 
   onDeleteGroup, 
@@ -79,8 +77,6 @@ export function ExpenseList({
 
   if (!expenses || expenses.length === 0) {
     return (
-        // The Card and CardHeader are now handled by the parent in pages/index.tsx
-        // This component will just render the "no data" message or the table
          <div className="text-muted-foreground text-center p-4">
             No hay gastos para mostrar con los filtros seleccionados.
          </div>
@@ -91,11 +87,9 @@ export function ExpenseList({
 
 
   return (
-    // The main Card and CardHeader are now in pages/index.tsx
-    // This component focuses on rendering the table itself
     <> 
       {isSingleGroupView && groupName && (
-            <div className="mb-4 text-right"> {/* Moved button outside table, but within list's content area */}
+            <div className="mb-4 text-right">
                  <AlertDialog>
                     <AlertDialogTrigger asChild>
                         <Button 
@@ -126,8 +120,6 @@ export function ExpenseList({
             </div>
         )}
         <Table>
-          {/* TableCaption can be removed if description is in CardHeader */}
-          {/* <TableCaption className="px-4 sm:px-6 py-2 text-xs sm:text-sm">{caption}</TableCaption> */}
           <TableHeader>
             <TableRow>
                 <TableHead className="px-2 py-2 sm:px-4">Producto</TableHead>
@@ -155,6 +147,10 @@ export function ExpenseList({
                   </TableCell>
                   <TableCell className="hidden lg:table-cell px-2 py-2 sm:px-4 whitespace-nowrap">{formatDate(expense.timestamp)}</TableCell> 
                   <TableCell className="text-right px-2 py-2 sm:px-4">
+                      <Button variant="ghost" size="icon" onClick={() => onEditExpense(expense)} className="mr-1">
+                          <Pencil className="h-4 w-4 text-blue-500" />
+                          <span className="sr-only">Editar</span>
+                      </Button>
                       <AlertDialog>
                           <AlertDialogTrigger asChild>
                               <Button variant="ghost" size="icon">
