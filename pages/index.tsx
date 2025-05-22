@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format as formatDateFns, endOfDay } from 'date-fns';
+import { format as formatDateFns, endOfDay, startOfDay, isWithinInterval } from 'date-fns';
 import { es } from 'date-fns/locale/es';
 
 
@@ -43,6 +43,9 @@ export default function Home() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
   const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
+
+  // State for active period tab in reporting (7days, 30days, 90days)
+  const [activePeriodTab, setActivePeriodTab] = useState<string>('7days');
 
 
   useEffect(() => {
@@ -95,8 +98,6 @@ export default function Home() {
             description: `La categoría "${DEFAULT_CATEGORY_KEY}" no puede ser eliminada, pero sus gastos sí.`,
             variant: "destructive",
         });
-        // Optionally, delete expenses but keep the category in the list
-        // setExpenses(prevExpenses => prevExpenses.filter(expense => expense.category !== categoryIdentifierToDelete));
         return;
     }
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.category !== categoryIdentifierToDelete));
@@ -160,8 +161,7 @@ export default function Home() {
             const productName = row.Producto?.trim();
             const priceStr = row.Precio?.trim();
             const categoryName = row.Categoria?.trim() || DEFAULT_CATEGORY_KEY;
-            // Use the key "Timestamp" which matches the export, not "Fecha y Hora"
-            const timestampStr = row.Timestamp?.trim();
+            const timestampStr = row.Timestamp?.trim(); // Matches the export header "Timestamp"
             const price = parseFloat(priceStr);
             const timestamp = safelyParseDate(timestampStr);
 
@@ -173,7 +173,7 @@ export default function Home() {
             }
             const newExpense: Expense = {
               id: uuidv4(),
-              product: { name: productName, value: 0, color: '' }, // value and color will be set by charts if needed
+              product: { name: productName, value: 0, color: '' },
               price: price,
               category: categoryName,
               timestamp: timestamp,
@@ -261,6 +261,26 @@ export default function Home() {
     if (!isClient) return 0;
     return filteredExpensesForList.reduce((sum, expense) => sum + expense.price, 0);
   }, [filteredExpensesForList, isClient]);
+
+  // Filter expenses based on activePeriodTab for CategoryCharts
+  const expensesFilteredByPeriodForCategoryCharts = useMemo(() => {
+    if (!isClient) return [];
+    let daysToFilter = 7; // Default to 7 days
+    if (activePeriodTab === '30days') daysToFilter = 30;
+    else if (activePeriodTab === '90days') daysToFilter = 90;
+
+    const today = new Date();
+    const cutoffDate = new Date(today);
+    cutoffDate.setDate(today.getDate() - daysToFilter + 1); // Include the cutoff day itself
+
+    const periodStart = startOfDay(cutoffDate);
+    const periodEnd = endOfDay(today);
+
+    return expenses.filter(expense => {
+        const expenseDate = safelyParseDate(expense.timestamp);
+        return expenseDate && isWithinInterval(expenseDate, { start: periodStart, end: periodEnd });
+    });
+  }, [expenses, activePeriodTab, isClient]);
 
 
   let activeGroupType: 'product' | 'category' | undefined = undefined;
@@ -358,8 +378,15 @@ export default function Home() {
 
           <TabsContent value="reporting">
             <div className="space-y-4 md:space-y-6">
-              <ExpenseCharts expenses={expenses} />
-              <CategoryCharts expenses={expenses} defaultCategoryKey={DEFAULT_CATEGORY_KEY} />
+              <ExpenseCharts 
+                expenses={expenses} 
+                activePeriodTab={activePeriodTab}
+                onActivePeriodTabChange={setActivePeriodTab}
+              />
+              <CategoryCharts 
+                expenses={expensesFilteredByPeriodForCategoryCharts} 
+                defaultCategoryKey={DEFAULT_CATEGORY_KEY} 
+              />
 
               <Card>
                 <CardHeader>
@@ -526,3 +553,5 @@ export default function Home() {
     </>
   );
 }
+
+    

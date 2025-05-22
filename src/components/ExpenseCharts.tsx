@@ -16,7 +16,7 @@ import { es } from 'date-fns/locale/es';
 
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatCurrency } from '@/lib/dateUtils'; // Corrected import path
+import { formatCurrency, safelyParseDate } from '@/lib/dateUtils'; // Corrected import path
 import { Skeleton } from "@/components/ui/skeleton"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 // Corrected import paths for chart components
@@ -50,6 +50,8 @@ import type { Expense } from '@/types/expense';
 
 interface ExpenseChartsProps {
     expenses: Expense[];
+    activePeriodTab: string;
+    onActivePeriodTabChange: (tabValue: string) => void;
 }
 
 
@@ -86,8 +88,10 @@ const aggregateStackedExpensesByDay = (
   }
 
   expenses.forEach((expense) => {
-    // Safely parse the timestamp
-    const expenseDate =  new Date(expense.timestamp);
+    const expenseTimestamp = safelyParseDate(expense.timestamp);
+    if (!expenseTimestamp) return; // Skip if date is invalid
+
+    const expenseDate =  new Date(expenseTimestamp);
     expenseDate.setHours(0, 0, 0, 0); // Consider only the date part
 
         if (expenseDate >= cutoffDate && expenseDate <= today) {
@@ -174,54 +178,42 @@ const generateChartConfig = (productKeysMap: { [key: string]: string }): ChartCo
 };
 
 
-export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
+export function ExpenseCharts({ expenses, activePeriodTab, onActivePeriodTabChange }: ExpenseChartsProps) {
     const [isClient, setIsClient] = useState(false);
-
-    // State for chart data and product keys for each period
-    const [chartData7Days, setChartData7Days] = useState<DailyProductExpense[]>([]);
-    const [productKeys7Days, setProductKeys7Days] = useState<{ [key: string]: string }>({});
-    const [chartData30Days, setChartData30Days] = useState<DailyProductExpense[]>([]);
-    const [productKeys30Days, setProductKeys30Days] = useState<{ [key: string]: string }>({});
-    const [chartData90Days, setChartData90Days] = useState<DailyProductExpense[]>([]);
-    const [productKeys90Days, setProductKeys90Days] = useState<{ [key: string]: string }>({});
-
 
     useEffect(() => {
         setIsClient(true);
-        // Calculate data only on the client side
-        const data7 = aggregateStackedExpensesByDay(expenses, 7);
-        setChartData7Days(data7.data);
-        setProductKeys7Days(data7.productKeys);
+    }, []);
 
-        const data30 = aggregateStackedExpensesByDay(expenses, 30);
-        setChartData30Days(data30.data);
-        setProductKeys30Days(data30.productKeys);
+    const chartData7Days = useMemo(() => {
+        if (!isClient) return { data: [], productKeys: {} };
+        return aggregateStackedExpensesByDay(expenses, 7);
+    }, [expenses, isClient]);
 
-        const data90 = aggregateStackedExpensesByDay(expenses, 90);
-        setChartData90Days(data90.data);
-        setProductKeys90Days(data90.productKeys);
+    const chartData30Days = useMemo(() => {
+        if (!isClient) return { data: [], productKeys: {} };
+        return aggregateStackedExpensesByDay(expenses, 30);
+    }, [expenses, isClient]);
 
-    }, [expenses]); // Recalculate when expenses change
+    const chartData90Days = useMemo(() => {
+        if (!isClient) return { data: [], productKeys: {} };
+        return aggregateStackedExpensesByDay(expenses, 90);
+    }, [expenses, isClient]);
+
 
     // Custom Tooltip Content Component
-    const CustomTooltip = ({ active, payload, label, config, productKeysMap, expenses }: { active: boolean; payload: any[]; label: string; config: ChartConfig; productKeysMap: { [key: string]: string }; expenses: Expense[]; }) => {
-      if (active && payload && payload.length) {
-
-
-            const data = payload[0].payload as DailyProductExpense; // The full data for the hovered day
-
+    const CustomTooltip = ({ active, payload, label, config, productKeysMap, allExpenses }: { active?: boolean; payload?: any[]; label?: string; config: ChartConfig; productKeysMap: { [key: string]: string }; allExpenses: Expense[]; }) => {
+      if (active && payload && payload.length && label) {
+            const data = payload[0].payload as DailyProductExpense; 
             const productsWithExpenses:ProductWithExpenses[] = [];
 
-             // Iterate through each unique product found in the expenses
             Object.keys(productKeysMap).forEach((productKey) => {
-                // Try to find the full product information from the expenses list
-                const fullProductInfo = expenses.find(expense => expense.product.name === productKey)?.product;
-
+                const fullProductInfo = allExpenses.find(expense => expense.product.name === productKey)?.product;
                 if (fullProductInfo) {
                   const productExpense = data[productKey] as number || 0;
                     productsWithExpenses.push({
                         ...fullProductInfo,
-                        key: productKey, // Use the product key
+                        key: productKey, 
                         value: productExpense,
                         color: config[productKey]?.color || '#ccc'
                       })
@@ -232,7 +224,7 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
 
 
             return (
-                <div className="rounded-lg border bg-background p-2.5 text-xs sm:text-sm shadow-lg max-w-[250px] sm:max-w-xs"> {/* Adjusted padding and font size, max-width */}
+                <div className="rounded-lg border bg-background p-2.5 text-xs sm:text-sm shadow-lg max-w-[250px] sm:max-w-xs">
                     <div className="mb-1.5 font-medium">{label}</div> {/* Date */}
                     <div className="mb-1 border-t pt-1 font-semibold">
                         Total Día: {formatCurrency(data.total)}
@@ -240,14 +232,14 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                     <div className="grid gap-1">
                         {filteredProductsWithExpenses.map((product) => (
                             <div key={product.key} className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 overflow-hidden"> {/* Added overflow hidden */}
+                                <div className="flex items-center gap-1.5 overflow-hidden"> 
                                     <span
                                         className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
                                         style={{ backgroundColor: product.color }}
                                     />
-                                    <span className="text-muted-foreground truncate">{product.name}:</span> {/* Added truncate */}
+                                    <span className="text-muted-foreground truncate">{product.name}:</span> 
                                 </div>
-                                <span className="font-semibold whitespace-nowrap">{formatCurrency(product.value)}</span> {/* Added whitespace-nowrap */}
+                                <span className="font-semibold whitespace-nowrap">{formatCurrency(product.value)}</span> 
                             </div>
                         ))}
                          {filteredProductsWithExpenses.length === 0 && (
@@ -260,14 +252,12 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
         return null;
     };
 
-    const renderChart = (data: DailyProductExpense[], productKeysMap: { [key: string]: string }, period: string) => {
-        // Memoize chartConfig generation. Colors will be random but stable unless productKeysMap changes.
+    const renderChart = (data: DailyProductExpense[], productKeysMap: { [key: string]: string }, periodLabel: string) => {
         const chartConfig = useMemo(() => generateChartConfig(productKeysMap), [productKeysMap]);
-        // Removed productKeys constant as it's not directly used for rendering lines anymore
 
         if (!isClient) {
             return (
-                 <div className="mt-4 p-4 rounded-md border bg-card space-y-2 min-h-[250px] sm:min-h-[350px]"> {/* Adjusted min-height */}
+                 <div className="mt-4 p-4 rounded-md border bg-card space-y-2 min-h-[250px] sm:min-h-[350px]">
                     <Skeleton className="h-5 sm:h-6 w-3/4 mb-4" />
                     <Skeleton className="h-[200px] sm:h-[300px] w-full" />
                 </div>
@@ -276,18 +266,17 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
 
          if (data.length === 0 || data.every(d => d.total === 0)) {
              const message = expenses.length === 0
-                 ? 'Agrega gastos para ver el gráfico.' // Hardcoded Spanish
-                 : `No hay gastos en los últimos ${period} días.`; // Hardcoded Spanish
+                 ? 'Agrega gastos para ver el gráfico.'
+                 : `No hay gastos en los últimos ${periodLabel} días.`;
              return (
-                 <div className="mt-4 p-4 rounded-md border bg-card text-center min-h-[250px] sm:min-h-[350px] flex items-center justify-center"> {/* Adjusted min-height */}
-                    <p className="text-muted-foreground text-sm sm:text-base">{message}</p> {/* Adjusted font size */}
+                 <div className="mt-4 p-4 rounded-md border bg-card text-center min-h-[250px] sm:min-h-[350px] flex items-center justify-center">
+                    <p className="text-muted-foreground text-sm sm:text-base">{message}</p>
                  </div>
              );
          }
 
          return (
-             // Use ChartContainer config for CSS variables, even if not directly mapping lines
-             <ChartContainer config={chartConfig} className="min-h-[250px] sm:min-h-[350px] w-full mt-4"> {/* Adjusted min-height */}
+             <ChartContainer config={chartConfig} className="min-h-[250px] sm:min-h-[350px] w-full mt-4">
                 <ResponsiveContainer width="100%" height={isClient ? window.innerWidth < 640 ? 250 : 350 : 350}>
                      <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
                          <CartesianGrid vertical={false} strokeDasharray="3 3" />
@@ -296,49 +285,43 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
                              tickLine={false}
                              axisLine={false}
                              tickMargin={8}
-                             fontSize={10} // Smaller font size for dates
+                             fontSize={10} 
                          />
                          <YAxis
                              tickFormatter={(value) => formatCurrency(value)}
                              tickLine={false}
                              axisLine={false}
                              tickMargin={8}
-                             width={60} // Reduced width for Y-axis labels
-                             fontSize={10} // Smaller font size for currency
+                             width={60} 
+                             fontSize={10} 
                          />
-                         {/* Use the custom tooltip component */}
                          <Tooltip
-                             cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} // Customize cursor appearance
-                             formatter={(value, name, props) => {
-                                 // Return value with the name
-                                 return [value, props.payload.name];
-                             }}
-                             content={({ active = false, payload = [], label }) => (
+                             cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} 
+                             content={({ active, payload, label }) => (
                                  <CustomTooltip
                                      active={active}
                                      payload={payload}
                                      label={label}
-                                     config={chartConfig} productKeysMap={productKeysMap} expenses={expenses} />
+                                     config={chartConfig} 
+                                     productKeysMap={productKeysMap} 
+                                     allExpenses={expenses} />
                              )}
                          />
-
-                         {/* Single Area for total */}
                          <Area
                              type="linear"
                              dataKey="total"
                              stroke="none"
-                             fill="var(--color-total)" // Use color defined in chartConfig
+                             fill="var(--color-total)" 
                              fillOpacity={0.4}
                          />
-                         {/* Single Line for total */}
                          <Line
                              type="linear"
                              dataKey="total"
-                             stroke="var(--color-total)" // Use color defined in chartConfig
+                             stroke="var(--color-total)" 
                              strokeWidth={2}
                              dot={false}
-                             activeDot={{ // Style the active dot on hover
-                                 r: 4, // Smaller dot on mobile
+                             activeDot={{ 
+                                 r: 4, 
                                  fill: 'var(--color-total)',
                                  stroke: 'hsl(var(--background))',
                                  strokeWidth: 2,
@@ -354,25 +337,23 @@ export function ExpenseCharts({ expenses }: ExpenseChartsProps) {
   return (
     <Card>
       <CardHeader>
-        {/* Updated Title */}
-        <CardTitle className="text-lg sm:text-xl">Análisis de Gastos Totales por Día</CardTitle> {/* Adjusted title size */}
+        <CardTitle className="text-lg sm:text-xl">Análisis de Gastos Totales por Día</CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="7days" className="w-full">
-           {/* Adjust TabsList for better mobile wrapping if needed */}
+        <Tabs value={activePeriodTab} onValueChange={onActivePeriodTabChange} className="w-full">
            <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="7days">7 Días</TabsTrigger> {/* Shortened text */}
-            <TabsTrigger value="30days">30 Días</TabsTrigger> {/* Shortened text */}
-            <TabsTrigger value="90days">90 Días</TabsTrigger> {/* Shortened text */}
+            <TabsTrigger value="7days">7 Días</TabsTrigger>
+            <TabsTrigger value="30days">30 Días</TabsTrigger>
+            <TabsTrigger value="90days">90 Días</TabsTrigger>
            </TabsList>
           <TabsContent value="7days">
-            {renderChart(chartData7Days, productKeys7Days, "7")}
+            {renderChart(chartData7Days.data, chartData7Days.productKeys, "7")}
           </TabsContent>
           <TabsContent value="30days">
-            {renderChart(chartData30Days, productKeys30Days, "30")}
+            {renderChart(chartData30Days.data, chartData30Days.productKeys, "30")}
           </TabsContent>
           <TabsContent value="90days">
-            {renderChart(chartData90Days, productKeys90Days, "90")}
+            {renderChart(chartData90Days.data, chartData90Days.productKeys, "90")}
           </TabsContent>
         </Tabs>
       </CardContent>
