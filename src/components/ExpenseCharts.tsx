@@ -8,241 +8,180 @@ import {
     YAxis,
     CartesianGrid,
     ResponsiveContainer,
-    Tooltip // Import Tooltip directly from recharts
+    Tooltip
 } from 'recharts';
-import { format as formatDateFns } from 'date-fns';
-// Correct import path for locales
+import { format as formatDateFns, startOfDay as dateFnsStartOfDay, eachDayOfInterval, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale/es';
 
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { formatCurrency, safelyParseDate } from '@/lib/dateUtils'; // Corrected import path
+import { formatCurrency, safelyParseDate } from '@/lib/dateUtils';
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-// Corrected import paths for chart components
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
+import { ChartContainer, type ChartConfig } from "@/components/ui/chart"
+import type { Expense, Product } from '@/types/expense';
 
-
-// Define the type for a single day's product expenses
 interface DailyProductExpense {
-    date: string;         // Display date
-    _rawDate: string;      // Internal date key
+    date: string;         // Display date (e.g., "dd MMM")
+    _rawDate: Date;     // Full date object for sorting/comparison
     total: number;        // Total expense for the day
-    [key: string]: number | string; // Dynamic properties for each product's expense
+    [key: string]: number | string | Date; // Dynamic properties for each product's expense
 }
 
 interface ProductWithExpenses extends Product {
     key: string;
-    value: number;
-    color: string;
+    value: number; // Expense value for this product on this day
+    color: string; // Color for this product in the chart/tooltip
 }
 
-// Define the type for the data returned by the aggregation function
-interface AggregatedExpenses {
+interface AggregatedExpensesOutput {
     data: DailyProductExpense[];
-    productKeys: { [key: string]: string }; // Map of product keys to product names
+    productKeysMap: { [key: string]: string }; // Maps product key (e.g., name) to display name
+    chartConfig: ChartConfig;
 }
-
-
-// Use the actual Expense type
-import { Product } from '@/types/expense';
-import type { Expense } from '@/types/expense';
 
 interface ExpenseChartsProps {
-    expenses: Expense[];
-    activePeriodTab: string;
-    onActivePeriodTabChange: (tabValue: string) => void;
+    expenses: Expense[]; // These are already filtered by global filters (product, category, date range)
+    startDate: Date | null; // Start of the global filter period
+    endDate: Date | null;   // End of the global filter period
 }
 
+const aggregateAndProcessExpenses = (
+    filteredExpenses: Expense[],
+    filterStartDate: Date | null,
+    filterEndDate: Date | null
+): AggregatedExpensesOutput => {
+    const productKeysMap: { [key: string]: string } = {};
+    const dailyDataMap = new Map<string, DailyProductExpense>();
 
-// Function to aggregate expenses by day and product (remains largely the same)
-const aggregateStackedExpensesByDay = (
-  expenses: Expense[],
-  days: number
-): AggregatedExpenses => {
-  const today = new Date();
-  const cutoffDate = new Date(today);
-  cutoffDate.setDate(today.getDate() - days + 1); // Include the cutoff day itself
-  cutoffDate.setHours(0, 0, 0, 0); // Start of the cutoff day
+    // Determine the actual start and end dates for iteration
+    // Fallback to a default range (e.g., last 7 days) if dates are null, though parent should provide valid ones.
+    const today = new Date();
+    const actualStartDate = filterStartDate ? dateFnsStartOfDay(filterStartDate) : dateFnsStartOfDay(new Date(today.setDate(today.getDate() - 6)));
+    const actualEndDate = filterEndDate ? dateFnsStartOfDay(filterEndDate) : dateFnsStartOfDay(new Date());
 
-  interface DailyTotalsType {
-    [date: string]: { // index signature
-      total: number;
-      products: { [productKey: string]: number };
-    };
-  }
-
-  const dailyTotals: DailyTotalsType = {};
-  const productKeysMap: { [key: string]: string } = {};
-  const allDates = new Set<string>();
-  const dateFnsLocale = es; // Default to Spanish locale
-
-
-  // Initialize daily totals for all dates within the range
-  let currentDate = new Date(cutoffDate);
-  while (currentDate <= today) {
-    const formattedDate = formatDateFns(currentDate, 'yyyy-MM-dd');
-    dailyTotals[formattedDate] = { total: 0, products: {} };
-    allDates.add(formattedDate); // Add date to the set
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-
-  expenses.forEach((expense) => {
-    const expenseTimestamp = safelyParseDate(expense.timestamp);
-    if (!expenseTimestamp) return; // Skip if date is invalid
-
-    const expenseDate =  new Date(expenseTimestamp);
-    expenseDate.setHours(0, 0, 0, 0); // Consider only the date part
-
-        if (expenseDate >= cutoffDate && expenseDate <= today) {
-      const formattedDate = formatDateFns(expenseDate, 'yyyy-MM-dd');
-      const productKey = expense.product.name; // Use product name as the key
-
-      // Store original product name
-      if (!productKeysMap[productKey]) {
-        productKeysMap[productKey] = expense.product.name;
-      }
-
-      if (!dailyTotals[formattedDate]) {
-        dailyTotals[formattedDate] = { total: 0, products: {} };
-      }
-
-      dailyTotals[formattedDate].products[productKey] = (dailyTotals[formattedDate].products[productKey] || 0) + expense.price;
-      dailyTotals[formattedDate].total += expense.price;
+    // Initialize data points for each day in the interval
+    if (actualStartDate && actualEndDate && actualStartDate <= actualEndDate) {
+        const daysInInterval = eachDayOfInterval({ start: actualStartDate, end: actualEndDate });
+        daysInInterval.forEach(day => {
+            const displayDate = formatDateFns(day, 'dd MMM', { locale: es });
+            const rawDateKey = day; // Use the Date object as key for map initially
+            dailyDataMap.set(formatDateFns(day, 'yyyy-MM-dd'), {
+                date: displayDate,
+                _rawDate: rawDateKey,
+                total: 0,
+            });
+        });
     }
-  });
-
-  // Convert to array format required by the chart
-  const aggregatedData = Array.from(allDates)
-    .map(dateKey => {
-      const dayData = dailyTotals[dateKey];
-      const displayDate = formatDateFns(new Date(dateKey + 'T00:00:00'), 'dd MMM', { locale: dateFnsLocale });
-
-      const productEntries = dayData ? dayData.products : {};
-      const totalEntry = dayData ? dayData.total : 0;
 
 
-      return {
-        date: displayDate,
-        _rawDate: dateKey,
-        total: totalEntry,
-        ...productEntries,
-      };
-    })
-    .sort((a, b) => a._rawDate.localeCompare(b._rawDate)); // Sort by raw date ascending
+    filteredExpenses.forEach((expense) => {
+        const expenseTimestamp = safelyParseDate(expense.timestamp);
+        if (!expenseTimestamp) return;
 
-  // Ensure all product keys exist in every data point (with value 0 if absent)
-  const finalData = aggregatedData.map(dayData => {
-    const completeDayData:DailyProductExpense = { ...dayData };
-      Object.keys(productKeysMap).forEach(productKey => {
-          if (!(productKey in completeDayData)) {
-              completeDayData[productKey] = 0;
-          }
-      });
+        const expenseDayStart = dateFnsStartOfDay(expenseTimestamp);
+        const dateKey = formatDateFns(expenseDayStart, 'yyyy-MM-dd');
+        
+        let dayEntry = dailyDataMap.get(dateKey);
 
+        if (dayEntry) { // Only process if the expense falls within the initialized range
+            const productKey = expense.product.name;
+            if (!productKeysMap[productKey]) {
+                productKeysMap[productKey] = expense.product.name;
+            }
 
-
-    return completeDayData;
-  });
-
-
-  return { data: finalData, productKeys: productKeysMap };
-};
-
-// Function to generate chart config dynamically with random colors
-// Add a 'total' entry for the main line/area styling
-const generateChartConfig = (productKeysMap: { [key: string]: string }): ChartConfig => {
-    const config: ChartConfig = {
-        // Style for the total line/area
-        total: {
-            label: 'Total',
-            color: 'hsl(var(--chart-1))', // Use a primary chart color
-        },
-    };
-    const productKeys = Object.keys(productKeysMap);
-
-    productKeys.forEach((key, index) => {
-        // Generate HSL colors, trying to space them out more
-        const hue = (index * (360 / (productKeys.length + 1))) % 360; // Distribute hues
-        const saturation = Math.floor(Math.random() * 21) + 70; // 70-90% saturation
-        const lightness = Math.floor(Math.random() * 21) + 55; // 55-75% lightness
-        const randomColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
-
-        config[key] = {
-            label: productKeysMap[key], // Use original product name for label
-            color: randomColor,         // Assign the generated random color
-        };
+            dayEntry.total += expense.price;
+            dayEntry[productKey] = (dayEntry[productKey] as number || 0) + expense.price;
+        }
     });
 
-    return config;
+    const aggregatedData: DailyProductExpense[] = Array.from(dailyDataMap.values())
+                                                     .sort((a, b) => (a._rawDate as Date).getTime() - (b._rawDate as Date).getTime());
+    
+    // Ensure all product keys exist in every data point
+     const finalData = aggregatedData.map(dayData => {
+        const completeDayData:DailyProductExpense = { ...dayData };
+        Object.keys(productKeysMap).forEach(productKey => {
+            if (!(productKey in completeDayData)) {
+                completeDayData[productKey] = 0; // Default to 0 if no expense for this product on this day
+            }
+        });
+        return completeDayData;
+    });
+
+
+    // Generate chart config
+    const chartConfig: ChartConfig = {
+        total: { label: 'Total', color: 'hsl(var(--chart-1))' },
+    };
+    Object.keys(productKeysMap).forEach((key, index) => {
+        const hue = (index * (360 / (Object.keys(productKeysMap).length + 2))) % 360; // +2 to avoid clash with total
+        const saturation = Math.floor(Math.random() * 21) + 70;
+        const lightness = Math.floor(Math.random() * 21) + 55;
+        chartConfig[key] = {
+            label: productKeysMap[key],
+            color: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        };
+    });
+    
+    return { data: finalData, productKeysMap, chartConfig };
 };
 
 
-export function ExpenseCharts({ expenses, activePeriodTab, onActivePeriodTabChange }: ExpenseChartsProps) {
+export function ExpenseCharts({ expenses: filteredExpenses, startDate, endDate }: ExpenseChartsProps) {
     const [isClient, setIsClient] = useState(false);
 
     useEffect(() => {
         setIsClient(true);
     }, []);
 
-    const chartData7Days = useMemo(() => {
-        if (!isClient) return { data: [], productKeys: {} };
-        return aggregateStackedExpensesByDay(expenses, 7);
-    }, [expenses, isClient]);
-
-    const chartData30Days = useMemo(() => {
-        if (!isClient) return { data: [], productKeys: {} };
-        return aggregateStackedExpensesByDay(expenses, 30);
-    }, [expenses, isClient]);
-
-    const chartData90Days = useMemo(() => {
-        if (!isClient) return { data: [], productKeys: {} };
-        return aggregateStackedExpensesByDay(expenses, 90);
-    }, [expenses, isClient]);
+    const { data, productKeysMap, chartConfig } = useMemo(() => {
+        if (!isClient) return { data: [], productKeysMap: {}, chartConfig: {} };
+        return aggregateAndProcessExpenses(filteredExpenses, startDate, endDate);
+    }, [filteredExpenses, startDate, endDate, isClient]);
 
 
-    // Custom Tooltip Content Component
-    const CustomTooltip = ({ active, payload, label, config, productKeysMap, allExpenses }: { active?: boolean; payload?: any[]; label?: string; config: ChartConfig; productKeysMap: { [key: string]: string }; allExpenses: Expense[]; }) => {
+    const CustomTooltip = ({ active, payload, label, allExpensesFlat }: { active?: boolean; payload?: any[]; label?: string; allExpensesFlat: Expense[] }) => {
       if (active && payload && payload.length && label) {
-            const data = payload[0].payload as DailyProductExpense; 
-            const productsWithExpenses:ProductWithExpenses[] = [];
+            const dayData = payload[0].payload as DailyProductExpense;
+            const productsWithExpenses: ProductWithExpenses[] = [];
 
             Object.keys(productKeysMap).forEach((productKey) => {
-                const fullProductInfo = allExpenses.find(expense => expense.product.name === productKey)?.product;
-                if (fullProductInfo) {
-                  const productExpense = data[productKey] as number || 0;
-                    productsWithExpenses.push({
-                        ...fullProductInfo,
-                        key: productKey, 
-                        value: productExpense,
-                        color: config[productKey]?.color || '#ccc'
-                      })
-                }
-            })
+                 // Find the original product object to get its full details if needed (e.g., color from chartConfig)
+                const productInfoFromConfig = chartConfig[productKey];
+                const productExpenseOnDay = dayData[productKey] as number || 0;
 
-            const filteredProductsWithExpenses = productsWithExpenses.filter(p => p.value > 0).sort((a,b) => b.value - a.value)
+                if (productInfoFromConfig && productExpenseOnDay > 0) {
+                    productsWithExpenses.push({
+                        name: productKeysMap[productKey], // Original name
+                        value: productExpenseOnDay,    // Expense for this product on this day
+                        color: productInfoFromConfig.color || '#ccc', // Color from config
+                        key: productKey, // Internal key
+                    });
+                }
+            });
+            
+            productsWithExpenses.sort((a, b) => b.value - a.value);
 
 
             return (
                 <div className="rounded-lg border bg-background p-2.5 text-xs sm:text-sm shadow-lg max-w-[250px] sm:max-w-xs">
-                    <div className="mb-1.5 font-medium">{label}</div> {/* Date */}
+                    <div className="mb-1.5 font-medium">{label}</div> {/* Date (e.g., "05 May") */}
                     <div className="mb-1 border-t pt-1 font-semibold">
-                        Total Día: {formatCurrency(data.total)}
+                        Total Día: {formatCurrency(dayData.total)}
                     </div>
                     <div className="grid gap-1">
-                        {filteredProductsWithExpenses.map((product) => (
+                        {productsWithExpenses.map((product) => (
                             <div key={product.key} className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 overflow-hidden"> 
+                                <div className="flex items-center gap-1.5 overflow-hidden">
                                     <span
                                         className="h-2.5 w-2.5 shrink-0 rounded-[2px]"
                                         style={{ backgroundColor: product.color }}
                                     />
-                                    <span className="text-muted-foreground truncate">{product.name}:</span> 
+                                    <span className="text-muted-foreground truncate">{product.name}:</span>
                                 </div>
-                                <span className="font-semibold whitespace-nowrap">{formatCurrency(product.value)}</span> 
+                                <span className="font-semibold whitespace-nowrap">{formatCurrency(product.value)}</span>
                             </div>
                         ))}
-                         {filteredProductsWithExpenses.length === 0 && (
+                         {productsWithExpenses.length === 0 && dayData.total === 0 && (
                              <div className="text-muted-foreground text-xs">Sin gastos registrados para este día.</div>
                          )}
                     </div>
@@ -252,86 +191,30 @@ export function ExpenseCharts({ expenses, activePeriodTab, onActivePeriodTabChan
         return null;
     };
 
-    const renderChart = (data: DailyProductExpense[], productKeysMap: { [key: string]: string }, periodLabel: string) => {
-        const chartConfig = useMemo(() => generateChartConfig(productKeysMap), [productKeysMap]);
-
-        if (!isClient) {
-            return (
-                 <div className="mt-4 p-4 rounded-md border bg-card space-y-2 min-h-[250px] sm:min-h-[350px]">
-                    <Skeleton className="h-5 sm:h-6 w-3/4 mb-4" />
-                    <Skeleton className="h-[200px] sm:h-[300px] w-full" />
-                </div>
-            );
-        }
-
-         if (data.length === 0 || data.every(d => d.total === 0)) {
-             const message = expenses.length === 0
-                 ? 'Agrega gastos para ver el gráfico.'
-                 : `No hay gastos en los últimos ${periodLabel} días.`;
-             return (
-                 <div className="mt-4 p-4 rounded-md border bg-card text-center min-h-[250px] sm:min-h-[350px] flex items-center justify-center">
-                    <p className="text-muted-foreground text-sm sm:text-base">{message}</p>
-                 </div>
-             );
-         }
-
-         return (
-             <ChartContainer config={chartConfig} className="min-h-[250px] sm:min-h-[350px] w-full mt-4">
-                <ResponsiveContainer width="100%" height={isClient ? window.innerWidth < 640 ? 250 : 350 : 350}>
-                     <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
-                         <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                         <XAxis
-                             dataKey="date"
-                             tickLine={false}
-                             axisLine={false}
-                             tickMargin={8}
-                             fontSize={10} 
-                         />
-                         <YAxis
-                             tickFormatter={(value) => formatCurrency(value)}
-                             tickLine={false}
-                             axisLine={false}
-                             tickMargin={8}
-                             width={60} 
-                             fontSize={10} 
-                         />
-                         <Tooltip
-                             cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }} 
-                             content={({ active, payload, label }) => (
-                                 <CustomTooltip
-                                     active={active}
-                                     payload={payload}
-                                     label={label}
-                                     config={chartConfig} 
-                                     productKeysMap={productKeysMap} 
-                                     allExpenses={expenses} />
-                             )}
-                         />
-                         <Area
-                             type="linear"
-                             dataKey="total"
-                             stroke="none"
-                             fill="var(--color-total)" 
-                             fillOpacity={0.4}
-                         />
-                         <Line
-                             type="linear"
-                             dataKey="total"
-                             stroke="var(--color-total)" 
-                             strokeWidth={2}
-                             dot={false}
-                             activeDot={{ 
-                                 r: 4, 
-                                 fill: 'var(--color-total)',
-                                 stroke: 'hsl(var(--background))',
-                                 strokeWidth: 2,
-                             }} 
-                         />
-                     </LineChart>
-                 </ResponsiveContainer>
-             </ChartContainer>
+    if (!isClient) {
+        return (
+            <Card>
+                <CardHeader><CardTitle><Skeleton className="h-6 w-3/4" /></CardTitle></CardHeader>
+                <CardContent className="min-h-[250px] sm:min-h-[350px] flex items-center justify-center">
+                    <Skeleton className="h-full w-full" />
+                </CardContent>
+            </Card>
         );
-    };
+    }
+    
+    if (data.length === 0 || data.every(d => d.total === 0)) {
+         const message = filteredExpenses.length === 0 && !startDate && !endDate
+             ? 'Aplica filtros o agrega gastos para ver el gráfico.'
+             : 'No hay gastos para el período o filtros seleccionados.';
+         return (
+            <Card>
+                <CardHeader><CardTitle className="text-lg sm:text-xl">Análisis de Gastos Totales por Día</CardTitle></CardHeader>
+                <CardContent className="min-h-[250px] sm:min-h-[350px] flex items-center justify-center">
+                    <p className="text-muted-foreground text-sm sm:text-base">{message}</p>
+                </CardContent>
+            </Card>
+         );
+     }
 
 
   return (
@@ -340,25 +223,62 @@ export function ExpenseCharts({ expenses, activePeriodTab, onActivePeriodTabChan
         <CardTitle className="text-lg sm:text-xl">Análisis de Gastos Totales por Día</CardTitle>
       </CardHeader>
       <CardContent>
-        <Tabs value={activePeriodTab} onValueChange={onActivePeriodTabChange} className="w-full">
-           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="7days">7 Días</TabsTrigger>
-            <TabsTrigger value="30days">30 Días</TabsTrigger>
-            <TabsTrigger value="90days">90 Días</TabsTrigger>
-           </TabsList>
-          <TabsContent value="7days">
-            {renderChart(chartData7Days.data, chartData7Days.productKeys, "7")}
-          </TabsContent>
-          <TabsContent value="30days">
-            {renderChart(chartData30Days.data, chartData30Days.productKeys, "30")}
-          </TabsContent>
-          <TabsContent value="90days">
-            {renderChart(chartData90Days.data, chartData90Days.productKeys, "90")}
-          </TabsContent>
-        </Tabs>
+        <ChartContainer config={chartConfig} className="min-h-[250px] sm:min-h-[350px] w-full">
+            <ResponsiveContainer width="100%" height={isClient ? (window.innerWidth < 640 ? 250 : 350) : 350}>
+                 <LineChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 5 }}>
+                     <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                     <XAxis
+                         dataKey="date" // Display date like "05 May"
+                         tickLine={false}
+                         axisLine={false}
+                         tickMargin={8}
+                         fontSize={10}
+                     />
+                     <YAxis
+                         tickFormatter={(value) => formatCurrency(value)}
+                         tickLine={false}
+                         axisLine={false}
+                         tickMargin={8}
+                         width={60}
+                         fontSize={10}
+                     />
+                     <Tooltip
+                         cursor={{ fill: 'hsl(var(--muted))', fillOpacity: 0.3 }}
+                         content={({ active, payload, label }) => (
+                             <CustomTooltip
+                                 active={active}
+                                 payload={payload}
+                                 label={label}
+                                 allExpensesFlat={filteredExpenses} // Pass all original expenses for full product info if needed
+                                 />
+                         )}
+                     />
+                     <Area
+                         type="linear"
+                         dataKey="total"
+                         stroke="none"
+                         fill="var(--color-total)"
+                         fillOpacity={0.4}
+                         name="Total" // For default tooltip if CustomTooltip is not used
+                     />
+                     <Line
+                         type="linear"
+                         dataKey="total"
+                         stroke="var(--color-total)"
+                         strokeWidth={2}
+                         dot={false}
+                         activeDot={{
+                             r: 4,
+                             fill: 'var(--color-total)',
+                             stroke: 'hsl(var(--background))',
+                             strokeWidth: 2,
+                         }}
+                         name="Total"
+                     />
+                 </LineChart>
+             </ResponsiveContainer>
+         </ChartContainer>
       </CardContent>
     </Card>
   );
 }
-
-    

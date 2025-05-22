@@ -5,7 +5,7 @@ import { ExpenseForm } from '@/components/ExpenseForm';
 import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ExpenseList } from '@/components/ExpenseList';
 import { ExpenseCharts } from '@/components/ExpenseCharts';
-import { CategoryCharts } from '@/components/CategoryCharts'; // New import
+import { CategoryCharts } from '@/components/CategoryCharts';
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,18 +18,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, Calendar as CalendarIcon } from 'lucide-react';
+import { Upload, Download, Calendar as CalendarIcon, FilterX } from 'lucide-react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format as formatDateFns, endOfDay, startOfDay, isWithinInterval } from 'date-fns';
+import { format as formatDateFns, endOfDay, startOfDay, isWithinInterval, subDays } from 'date-fns';
 import { es } from 'date-fns/locale/es';
 
 
 const DEFAULT_CATEGORY_KEY = 'no definido';
+
+type QuickRangeValue = '7days' | '30days' | '90days' | 'custom';
 
 export default function Home() {
   const { toast } = useToast();
@@ -39,13 +41,12 @@ export default function Home() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
 
+  // Filters for Reporting Tab
   const [selectedProductFilter, setSelectedProductFilter] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
   const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
-
-  // State for active period tab in reporting (7days, 30days, 90days)
-  const [activePeriodTab, setActivePeriodTab] = useState<string>('7days');
+  const [selectedQuickRange, setSelectedQuickRange] = useState<QuickRangeValue>('7days');
 
 
   useEffect(() => {
@@ -57,6 +58,33 @@ export default function Home() {
       setCategories(prev => [...prev, DEFAULT_CATEGORY_KEY].sort());
     }
   }, [categories, setCategories, isClient]);
+
+  // Effect to update date filters when quick range changes
+  useEffect(() => {
+    if (!isClient) return;
+    const today = new Date();
+    let newStart: Date | null = null;
+    let newEnd: Date | null = null;
+
+    if (selectedQuickRange === '7days') {
+      newStart = startOfDay(subDays(today, 6));
+      newEnd = endOfDay(today);
+    } else if (selectedQuickRange === '30days') {
+      newStart = startOfDay(subDays(today, 29));
+      newEnd = endOfDay(today);
+    } else if (selectedQuickRange === '90days') {
+      newStart = startOfDay(subDays(today, 89));
+      newEnd = endOfDay(today);
+    } else if (selectedQuickRange === 'custom') {
+      // When 'custom' is selected, we don't automatically change dates here.
+      // The user will use the date pickers.
+      // If date pickers were used to set 'custom', their values are preserved.
+      return;
+    }
+    setStartDateFilter(newStart);
+    setEndDateFilter(newEnd);
+  }, [selectedQuickRange, isClient]);
+
 
   const handleAddExpense = (newExpenseData: Omit<Expense, 'id' | 'timestamp'>) => {
     const categoryToAdd = newExpenseData.category?.trim() ? newExpenseData.category.trim() : DEFAULT_CATEGORY_KEY;
@@ -161,9 +189,27 @@ export default function Home() {
             const productName = row.Producto?.trim();
             const priceStr = row.Precio?.trim();
             const categoryName = row.Categoria?.trim() || DEFAULT_CATEGORY_KEY;
-            const timestampStr = row.Timestamp?.trim(); // Matches the export header "Timestamp"
+            const timestampStr = row.Timestamp?.trim();
             const price = parseFloat(priceStr);
-            const timestamp = safelyParseDate(timestampStr);
+            let timestamp = safelyParseDate(timestampStr); // ISO format preferred
+
+            // Attempt to parse "dd/MM/yyyy HH:mm" if ISO fails
+            if (!timestamp && typeof timestampStr === 'string') {
+                const parts = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
+                if (parts) {
+                    // parts[0] is full match, 1 is day, 2 is month, 3 is year, 4 is hour, 5 is minute
+                    const isoAttempt = `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`;
+                    timestamp = safelyParseDate(isoAttempt);
+                }
+            }
+             // Attempt to parse "dd/MM/yyyy HH:mm:ss" if previous attempts fail
+            if (!timestamp && typeof timestampStr === 'string') {
+                const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
+                if (partsWithSeconds) {
+                    const isoAttemptWithSeconds = `${partsWithSeconds[3]}-${partsWithSeconds[2]}-${partsWithSeconds[1]}T${partsWithSeconds[4]}:${partsWithSeconds[5]}:${partsWithSeconds[6]}`;
+                    timestamp = safelyParseDate(isoAttemptWithSeconds);
+                }
+            }
 
 
             if (!productName || isNaN(price) || price <= 0 || !timestamp) {
@@ -236,7 +282,7 @@ export default function Home() {
     return ['all', ...Array.from(cats).sort()];
   }, [expenses, isClient]);
 
-  const filteredExpensesForList = useMemo(() => {
+  const filteredExpenses = useMemo(() => {
     if (!isClient) return [];
     return expenses.filter(expense => {
       const productMatch = selectedProductFilter === 'all' || expense.product.name === selectedProductFilter;
@@ -246,41 +292,39 @@ export default function Home() {
       if (!expenseTimestamp) return false;
 
       let dateMatch = true;
-      if (startDateFilter && endDateFilter) {
-        dateMatch = expenseTimestamp >= startDateFilter && expenseTimestamp <= endOfDay(endDateFilter);
-      } else if (startDateFilter) {
-        dateMatch = expenseTimestamp >= startDateFilter;
-      } else if (endDateFilter) {
-        dateMatch = expenseTimestamp <= endOfDay(endDateFilter);
+      const effectiveStartDate = startDateFilter ? startOfDay(startDateFilter) : null;
+      const effectiveEndDate = endDateFilter ? endOfDay(endDateFilter) : null;
+
+      if (effectiveStartDate && effectiveEndDate) {
+        // Ensure comparison is inclusive by checking start of expense day vs start of filter day
+        // and end of expense day vs end of filter day, or more simply:
+        dateMatch = expenseTimestamp >= effectiveStartDate && expenseTimestamp <= effectiveEndDate;
+      } else if (effectiveStartDate) {
+        dateMatch = expenseTimestamp >= effectiveStartDate;
+      } else if (effectiveEndDate) {
+        dateMatch = expenseTimestamp <= effectiveEndDate;
       }
       return productMatch && categoryMatch && dateMatch;
     });
   }, [expenses, selectedProductFilter, selectedCategoryFilter, startDateFilter, endDateFilter, isClient]);
 
+
   const totalOfFilteredExpenses = useMemo(() => {
     if (!isClient) return 0;
-    return filteredExpensesForList.reduce((sum, expense) => sum + expense.price, 0);
-  }, [filteredExpensesForList, isClient]);
+    return filteredExpenses.reduce((sum, expense) => sum + expense.price, 0);
+  }, [filteredExpenses, isClient]);
 
-  // Filter expenses based on activePeriodTab for CategoryCharts
-  const expensesFilteredByPeriodForCategoryCharts = useMemo(() => {
-    if (!isClient) return [];
-    let daysToFilter = 7; // Default to 7 days
-    if (activePeriodTab === '30days') daysToFilter = 30;
-    else if (activePeriodTab === '90days') daysToFilter = 90;
-
-    const today = new Date();
-    const cutoffDate = new Date(today);
-    cutoffDate.setDate(today.getDate() - daysToFilter + 1); // Include the cutoff day itself
-
-    const periodStart = startOfDay(cutoffDate);
-    const periodEnd = endOfDay(today);
-
-    return expenses.filter(expense => {
-        const expenseDate = safelyParseDate(expense.timestamp);
-        return expenseDate && isWithinInterval(expenseDate, { start: periodStart, end: periodEnd });
-    });
-  }, [expenses, activePeriodTab, isClient]);
+  const handleClearFilters = () => {
+    setSelectedProductFilter('all');
+    setSelectedCategoryFilter('all');
+    setSelectedQuickRange('7days'); // This will trigger the useEffect to set dates
+    // Date pickers will update via the useEffect on selectedQuickRange
+  };
+  
+  const handleDateSelect = (dateSetter: (date: Date | null) => void, date: Date | null) => {
+    dateSetter(date);
+    setSelectedQuickRange('custom');
+  };
 
 
   let activeGroupType: 'product' | 'category' | undefined = undefined;
@@ -289,23 +333,29 @@ export default function Home() {
   let onDeleteActiveGroup: ((identifier: string) => void) | undefined = undefined;
 
   if (isClient) {
-    if (selectedProductFilter !== 'all' && selectedCategoryFilter === 'all' && !startDateFilter && !endDateFilter) {
-      activeGroupType = 'product';
-      activeGroupName = selectedProductFilter;
-      activeGroupDisplayName = selectedProductFilter;
-      onDeleteActiveGroup = handleDeleteProduct;
-    } else if (selectedCategoryFilter !== 'all' && selectedProductFilter === 'all' && !startDateFilter && !endDateFilter) {
-      activeGroupType = 'category';
-      activeGroupName = selectedCategoryFilter;
-      activeGroupDisplayName = selectedCategoryFilter;
-      onDeleteActiveGroup = handleDeleteCategory;
+    const isProductFiltered = selectedProductFilter !== 'all';
+    const isCategoryFiltered = selectedCategoryFilter !== 'all';
+    const isSpecificProductGroup = isProductFiltered && !isCategoryFiltered && selectedQuickRange === 'custom' && !startDateFilter && !endDateFilter;
+    const isSpecificCategoryGroup = isCategoryFiltered && !isProductFiltered && selectedQuickRange === 'custom' && !startDateFilter && !endDateFilter;
+
+
+    if (isProductFiltered && !isCategoryFiltered && !startDateFilter && !endDateFilter && (selectedQuickRange === 'custom' || (startDateFilter === null && endDateFilter === null ) )) {
+        activeGroupType = 'product';
+        activeGroupName = selectedProductFilter;
+        activeGroupDisplayName = selectedProductFilter;
+        onDeleteActiveGroup = handleDeleteProduct;
+    } else if (isCategoryFiltered && !isProductFiltered && !startDateFilter && !endDateFilter && (selectedQuickRange === 'custom' || (startDateFilter === null && endDateFilter === null ))) {
+        activeGroupType = 'category';
+        activeGroupName = selectedCategoryFilter;
+        activeGroupDisplayName = selectedCategoryFilter;
+        onDeleteActiveGroup = handleDeleteCategory;
     }
   }
 
 
   const historyListTitle = () => {
     if (selectedProductFilter !== 'all' && selectedCategoryFilter !== 'all') {
-      return `Historial de ${selectedProductFilter} en ${selectedCategoryFilter}`;
+      return `Historial de ${selectedProductFilter} (${selectedCategoryFilter})`;
     }
     if (selectedProductFilter !== 'all') {
       return `Historial de ${selectedProductFilter}`;
@@ -319,7 +369,7 @@ export default function Home() {
   const historyListCaption = () => {
     let baseCaption = "";
     if (selectedProductFilter !== 'all' && selectedCategoryFilter !== 'all') {
-      baseCaption = `Gastos para ${selectedProductFilter} en ${selectedCategoryFilter}`;
+      baseCaption = `Gastos para ${selectedProductFilter} (${selectedCategoryFilter})`;
     } else if (selectedProductFilter !== 'all') {
       baseCaption = `Gastos para el producto ${selectedProductFilter}`;
     } else if (selectedCategoryFilter !== 'all') {
@@ -337,8 +387,13 @@ export default function Home() {
       dateRangeString = ` hasta ${formatDateFns(endDateFilter, "PPP", { locale: es })}`;
     }
     
-    return `${baseCaption}${dateRangeString}.`;
+    return `${baseCaption}${dateRangeString}. Total: ${formatCurrency(totalOfFilteredExpenses)}`;
   };
+  
+  // Ensure default date range for graphs if filters are null
+  const todayForGraph = new Date();
+  const graphViewStartDate = startDateFilter ?? startOfDay(subDays(todayForGraph, 6));
+  const graphViewEndDate = endDateFilter ?? endOfDay(todayForGraph);
 
 
   return (
@@ -378,22 +433,12 @@ export default function Home() {
 
           <TabsContent value="reporting">
             <div className="space-y-4 md:space-y-6">
-              <ExpenseCharts 
-                expenses={expenses} 
-                activePeriodTab={activePeriodTab}
-                onActivePeriodTabChange={setActivePeriodTab}
-              />
-              <CategoryCharts 
-                expenses={expensesFilteredByPeriodForCategoryCharts} 
-                defaultCategoryKey={DEFAULT_CATEGORY_KEY} 
-              />
-
-              <Card>
+              <Card className="mb-4 md:mb-6">
                 <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Historial de Gastos</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl">Filtros de Reportería</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
                       <Select onValueChange={setSelectedProductFilter} value={selectedProductFilter} disabled={!isClient}>
@@ -429,83 +474,115 @@ export default function Home() {
                       </Select>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="start-date-filter" className="text-xs sm:text-sm">Fecha Desde:</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            id="start-date-filter"
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal mt-1",
-                              !startDateFilter && "text-muted-foreground"
-                            )}
-                            disabled={!isClient}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {startDateFilter ? formatDateFns(startDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={startDateFilter || undefined}
-                            onSelect={(date) => setStartDateFilter(date || null)}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+                    <div className="md:col-span-1">
+                      <Label htmlFor="quick-range-select" className="text-xs sm:text-sm">Rango Rápido:</Label>
+                      <Select onValueChange={(value) => setSelectedQuickRange(value as QuickRangeValue)} value={selectedQuickRange} disabled={!isClient}>
+                        <SelectTrigger id="quick-range-select" className="w-full mt-1">
+                          <SelectValue placeholder="Seleccionar Rango" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="7days">Últimos 7 días</SelectItem>
+                          <SelectItem value="30days">Últimos 30 días</SelectItem>
+                          <SelectItem value="90days">Últimos 90 días</SelectItem>
+                          <SelectItem value="custom">Personalizado</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div>
-                      <Label htmlFor="end-date-filter" className="text-xs sm:text-sm">Fecha Hasta:</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            id="end-date-filter"
-                            variant={"outline"}
-                            className={cn(
-                              "w-full justify-start text-left font-normal mt-1",
-                              !endDateFilter && "text-muted-foreground"
-                            )}
-                            disabled={!isClient}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {endDateFilter ? formatDateFns(endDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={endDateFilter || undefined}
-                            onSelect={(date) => setEndDateFilter(date || null)}
-                            disabled={(date) =>
-                              startDateFilter ? date < startDateFilter : false
-                            }
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
+                    <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                        <div>
+                          <Label htmlFor="start-date-filter" className="text-xs sm:text-sm">Fecha Desde:</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="start-date-filter"
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full justify-start text-left font-normal mt-1",
+                                  !startDateFilter && "text-muted-foreground"
+                                )}
+                                disabled={!isClient}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {startDateFilter ? formatDateFns(startDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={startDateFilter || undefined}
+                                onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div>
+                          <Label htmlFor="end-date-filter" className="text-xs sm:text-sm">Fecha Hasta:</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="end-date-filter"
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full justify-start text-left font-normal mt-1",
+                                  !endDateFilter && "text-muted-foreground"
+                                )}
+                                disabled={!isClient}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {endDateFilter ? formatDateFns(endDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={endDateFilter || undefined}
+                                onSelect={(date) => handleDateSelect(setEndDateFilter, date || null)}
+                                disabled={(date) =>
+                                  startDateFilter ? date < startDateFilter : false
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                     </div>
                   </div>
+                   <div className="flex justify-end">
+                        <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
+                            <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
+                        </Button>
+                    </div>
+                </CardContent>
+              </Card>
+              
+              <ExpenseCharts 
+                expenses={filteredExpenses} 
+                startDate={graphViewStartDate}
+                endDate={graphViewEndDate}
+              />
+              <CategoryCharts 
+                expenses={filteredExpenses} 
+                defaultCategoryKey={DEFAULT_CATEGORY_KEY} 
+              />
 
-                  <div className="mt-4 mb-2 text-right">
-                    <p className="text-lg font-semibold">
-                      Total Filtrado: {isClient ? formatCurrency(totalOfFilteredExpenses) : <Skeleton className="h-7 w-32 inline-block" />}
-                    </p>
-                  </div>
+              <Card>
+                <CardHeader>
+                   <CardTitle className="text-lg sm:text-xl">{historyListTitle()}</CardTitle>
+                   <CardDescription>{historyListCaption()}</CardDescription>
+                </CardHeader>
+                <CardContent className="px-0 sm:px-6 sm:pb-6">
                   {isClient ? (
                     <ExpenseList
-                      expenses={filteredExpensesForList}
+                      expenses={filteredExpenses}
                       onDeleteExpense={handleDeleteExpense}
                       groupName={activeGroupName}
                       onDeleteGroup={onDeleteActiveGroup}
                       groupTypeLabel={activeGroupType}
                       groupDisplayName={activeGroupDisplayName}
-                      title={historyListTitle()}
-                      caption={historyListCaption()}
                       defaultCategoryKey={DEFAULT_CATEGORY_KEY}
+                      // Title and caption are now part of CardHeader above
                     />
                   ) : (
                      <Skeleton className="h-64 w-full" />
@@ -553,5 +630,3 @@ export default function Home() {
     </>
   );
 }
-
-    

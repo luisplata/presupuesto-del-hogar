@@ -6,13 +6,13 @@ import React from 'react';
 import {
   Table,
   TableBody,
-  TableCaption,
+  TableCaption, // Keep if you decide to use it elsewhere, otherwise can remove
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Removed CardDescription if not used
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
 import { formatCurrency, formatDate, safelyParseDate } from '@/lib/dateUtils';
@@ -33,20 +33,18 @@ import { Badge } from '@/components/ui/badge';
 
 interface ExpenseListProps {
   expenses: Expense[];
-  title?: string;
-  caption?: string;
+  // title?: string; // Title will be handled by parent CardHeader
+  // caption?: string; // Caption will be handled by parent CardHeader CardDescription
   onDeleteExpense: (id: string) => void;
   groupName?: string;        
   groupDisplayName?: string; 
   onDeleteGroup?: (identifier: string) => void; 
-  groupTypeLabel?: 'product' | 'category' | undefined; // Allow undefined
+  groupTypeLabel?: 'product' | 'category' | undefined;
   defaultCategoryKey: string; 
 }
 
 export function ExpenseList({
   expenses,
-  title: propTitle, 
-  caption: propCaption, 
   onDeleteExpense,
   groupName, 
   groupDisplayName, 
@@ -55,14 +53,11 @@ export function ExpenseList({
   defaultCategoryKey 
 }: ExpenseListProps) {
   const { toast } = useToast();
-
-  const title = propTitle ?? 'Historial de Gastos';
-  const caption = propCaption ?? 'Lista de todos tus gastos.';
   
   const getGroupTypeDisplayLabel = () => {
     if (groupTypeLabel === 'product') return 'Producto';
     if (groupTypeLabel === 'category') return 'Categoría';
-    return 'Grupo'; // Fallback, though groupTypeLabel should be defined if groupName is
+    return 'Grupo';
   };
   const currentGroupTypeDisplayLabel = getGroupTypeDisplayLabel();
 
@@ -78,21 +73,17 @@ export function ExpenseList({
   const handleDeleteGroupClick = (identifier: string) => {
     if (onDeleteGroup && identifier) {
       onDeleteGroup(identifier);
-      // Toast message is handled in the parent (pages/index.tsx) for specific product/category deletion messages
     }
   };
 
 
   if (!expenses || expenses.length === 0) {
     return (
-       <Card>
-        <CardHeader className="px-4 py-3 sm:px-6 sm:py-4">
-          <CardTitle className="text-lg sm:text-xl">{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
-          <p className="text-muted-foreground text-center p-4">No hay gastos para mostrar.</p> 
-        </CardContent>
-      </Card>
+        // The Card and CardHeader are now handled by the parent in pages/index.tsx
+        // This component will just render the "no data" message or the table
+         <div className="text-muted-foreground text-center p-4">
+            No hay gastos para mostrar con los filtros seleccionados.
+         </div>
     )
   }
 
@@ -100,42 +91,43 @@ export function ExpenseList({
 
 
   return (
-    <Card>
-      <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 px-4 py-3 sm:px-6 sm:py-4">
-        <CardTitle className="text-lg sm:text-xl">{title}</CardTitle>
-        {isSingleGroupView && groupName && ( 
-             <AlertDialog>
-                <AlertDialogTrigger asChild>
-                    <Button 
-                        variant="destructive" 
-                        size="sm" 
-                        className="w-full sm:w-auto"
-                        disabled={groupTypeLabel === 'category' && groupName === defaultCategoryKey} // Disable delete for default category group
-                    >
-                        <Trash2 className="mr-2 h-4 w-4" /> Eliminar {currentGroupTypeDisplayLabel} ({groupDisplayName || groupName})
-                    </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Esta acción no se puede deshacer. Esto eliminará permanentemente todas las entradas para {currentGroupTypeDisplayLabel.toLowerCase()} "{groupDisplayName || groupName}".
-                        {groupTypeLabel === 'category' && groupName !== defaultCategoryKey && " La categoría también será eliminada de la lista de sugerencias."}
-                    </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDeleteGroupClick(groupName)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                         Eliminar {currentGroupTypeDisplayLabel}
-                    </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+    // The main Card and CardHeader are now in pages/index.tsx
+    // This component focuses on rendering the table itself
+    <> 
+      {isSingleGroupView && groupName && (
+            <div className="mb-4 text-right"> {/* Moved button outside table, but within list's content area */}
+                 <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                        <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            className="w-full sm:w-auto"
+                            disabled={groupTypeLabel === 'category' && groupName === defaultCategoryKey}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" /> Eliminar {currentGroupTypeDisplayLabel} ({groupDisplayName || groupName})
+                        </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta acción no se puede deshacer. Esto eliminará permanentemente todas las entradas para {currentGroupTypeDisplayLabel.toLowerCase()} "{groupDisplayName || groupName}".
+                            {groupTypeLabel === 'category' && groupName !== defaultCategoryKey && " La categoría también será eliminada de la lista de sugerencias."}
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteGroupClick(groupName)} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                             Eliminar {currentGroupTypeDisplayLabel}
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </div>
         )}
-      </CardHeader>
-      <CardContent className="px-0 sm:px-6 sm:pb-4">
         <Table>
-          <TableCaption className="px-4 sm:px-6 py-2 text-xs sm:text-sm">{caption}</TableCaption>
+          {/* TableCaption can be removed if description is in CardHeader */}
+          {/* <TableCaption className="px-4 sm:px-6 py-2 text-xs sm:text-sm">{caption}</TableCaption> */}
           <TableHeader>
             <TableRow>
                 <TableHead className="px-2 py-2 sm:px-4">Producto</TableHead>
@@ -190,7 +182,6 @@ export function ExpenseList({
             ))}
           </TableBody>
         </Table>
-      </CardContent>
-    </Card>
+    </>
   );
 }
