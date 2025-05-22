@@ -1,3 +1,4 @@
+
 // components/ExpenseList.tsx
 
 import type { Expense } from '@/types/expense';
@@ -38,7 +39,7 @@ interface ExpenseListProps {
   groupName?: string;        
   groupDisplayName?: string; 
   onDeleteGroup?: (identifier: string) => void; 
-  groupTypeLabel?: 'product' | 'category' | string; 
+  groupTypeLabel?: 'product' | 'category' | undefined; // Allow undefined
   defaultCategoryKey: string; 
 }
 
@@ -61,7 +62,7 @@ export function ExpenseList({
   const getGroupTypeDisplayLabel = () => {
     if (groupTypeLabel === 'product') return 'Producto';
     if (groupTypeLabel === 'category') return 'Categoría';
-    return groupTypeLabel || 'Grupo'; 
+    return 'Grupo'; // Fallback, though groupTypeLabel should be defined if groupName is
   };
   const currentGroupTypeDisplayLabel = getGroupTypeDisplayLabel();
 
@@ -75,7 +76,7 @@ export function ExpenseList({
   };
 
   const handleDeleteGroupClick = (identifier: string) => {
-    if (onDeleteGroup) {
+    if (onDeleteGroup && identifier) {
       onDeleteGroup(identifier);
       // Toast message is handled in the parent (pages/index.tsx) for specific product/category deletion messages
     }
@@ -105,7 +106,12 @@ export function ExpenseList({
         {isSingleGroupView && groupName && ( 
              <AlertDialog>
                 <AlertDialogTrigger asChild>
-                    <Button variant="destructive" size="sm" className="w-full sm:w-auto">
+                    <Button 
+                        variant="destructive" 
+                        size="sm" 
+                        className="w-full sm:w-auto"
+                        disabled={groupTypeLabel === 'category' && groupName === defaultCategoryKey} // Disable delete for default category group
+                    >
                         <Trash2 className="mr-2 h-4 w-4" /> Eliminar {currentGroupTypeDisplayLabel} ({groupDisplayName || groupName})
                     </Button>
                 </AlertDialogTrigger>
@@ -114,6 +120,7 @@ export function ExpenseList({
                     <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
                     <AlertDialogDescription>
                         Esta acción no se puede deshacer. Esto eliminará permanentemente todas las entradas para {currentGroupTypeDisplayLabel.toLowerCase()} "{groupDisplayName || groupName}".
+                        {groupTypeLabel === 'category' && groupName !== defaultCategoryKey && " La categoría también será eliminada de la lista de sugerencias."}
                     </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -151,7 +158,7 @@ export function ExpenseList({
                   <TableCell className="px-2 py-2 sm:px-4 whitespace-nowrap">{formatCurrency(expense.price)}</TableCell>
                   <TableCell className="hidden md:table-cell px-2 py-2 sm:px-4">
                       <Badge variant={expense.category === defaultCategoryKey ? 'secondary' : 'outline'} className="text-xs">
-                          {expense.category} 
+                          {expense.category || defaultCategoryKey} 
                       </Badge>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell px-2 py-2 sm:px-4 whitespace-nowrap">{formatDate(expense.timestamp)}</TableCell> 

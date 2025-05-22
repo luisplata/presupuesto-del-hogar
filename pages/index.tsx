@@ -5,10 +5,11 @@ import { ExpenseForm } from '@/components/ExpenseForm';
 import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ExpenseList } from '@/components/ExpenseList';
 import { ExpenseCharts } from '@/components/ExpenseCharts';
+import { CategoryCharts } from '@/components/CategoryCharts'; // New import
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
-import { safelyParseDate, formatCurrency } from '@/lib/dateUtils'; // Import formatCurrency
+import { safelyParseDate, formatCurrency } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
 
 import Head from 'next/head';
@@ -49,10 +50,10 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!categories.includes(DEFAULT_CATEGORY_KEY)) {
+    if (isClient && !categories.includes(DEFAULT_CATEGORY_KEY)) {
       setCategories(prev => [...prev, DEFAULT_CATEGORY_KEY].sort());
     }
-  }, [categories, setCategories]);
+  }, [categories, setCategories, isClient]);
 
   const handleAddExpense = (newExpenseData: Omit<Expense, 'id' | 'timestamp'>) => {
     const categoryToAdd = newExpenseData.category?.trim() ? newExpenseData.category.trim() : DEFAULT_CATEGORY_KEY;
@@ -70,7 +71,9 @@ export default function Home() {
       const timeB = safelyParseDate(b.timestamp)?.getTime() ?? 0;
       return timeB - timeA;
     }));
-    productInputRef.current?.focus();
+    if (productInputRef.current) {
+        productInputRef.current.focus();
+    }
   };
 
   const handleDeleteExpense = (idToDelete: string) => {
@@ -86,15 +89,26 @@ export default function Home() {
   };
 
   const handleDeleteCategory = (categoryIdentifierToDelete: string) => {
+    if (categoryIdentifierToDelete === DEFAULT_CATEGORY_KEY) {
+        toast({
+            title: 'Acción no permitida',
+            description: `La categoría "${DEFAULT_CATEGORY_KEY}" no puede ser eliminada, pero sus gastos sí.`,
+            variant: "destructive",
+        });
+        // Optionally, delete expenses but keep the category in the list
+        // setExpenses(prevExpenses => prevExpenses.filter(expense => expense.category !== categoryIdentifierToDelete));
+        return;
+    }
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.category !== categoryIdentifierToDelete));
-    if (categoryIdentifierToDelete !== DEFAULT_CATEGORY_KEY && categories.includes(categoryIdentifierToDelete)) {
+    if (categories.includes(categoryIdentifierToDelete)) {
       setCategories(prev => prev.filter(cat => cat !== categoryIdentifierToDelete));
     }
     toast({
         title: 'Categoría Eliminada',
-        description: `Todas las entradas para la categoría "${categoryIdentifierToDelete}" han sido eliminadas.`,
+        description: `Todas las entradas para la categoría "${categoryIdentifierToDelete}" han sido eliminadas, y la categoría ha sido removida de la lista.`,
     });
   };
+
 
   const handleExport = () => {
     if (!isClient) return;
@@ -146,19 +160,20 @@ export default function Home() {
             const productName = row.Producto?.trim();
             const priceStr = row.Precio?.trim();
             const categoryName = row.Categoria?.trim() || DEFAULT_CATEGORY_KEY;
+            // Use the key "Timestamp" which matches the export, not "Fecha y Hora"
             const timestampStr = row.Timestamp?.trim();
             const price = parseFloat(priceStr);
             const timestamp = safelyParseDate(timestampStr);
 
 
             if (!productName || isNaN(price) || price <= 0 || !timestamp) {
-              console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${productName}, Precio: ${priceStr}, Timestamp: ${timestampStr})`);
+              console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${productName}, Precio: ${priceStr}, Timestamp: ${timestampStr}, Fecha Parseada: ${timestamp})`);
               errorsFound++;
               return;
             }
             const newExpense: Expense = {
               id: uuidv4(),
-              product: { name: productName, value: 0, color: '' },
+              product: { name: productName, value: 0, color: '' }, // value and color will be set by charts if needed
               price: price,
               category: categoryName,
               timestamp: timestamp,
@@ -210,16 +225,19 @@ export default function Home() {
   };
 
   const uniqueProductsForFilter = useMemo(() => {
+    if (!isClient) return ['all'];
     const products = new Set(expenses.map(e => e.product.name));
     return ['all', ...Array.from(products).sort()];
-  }, [expenses]);
+  }, [expenses, isClient]);
 
   const uniqueCategoriesForFilter = useMemo(() => {
+    if (!isClient) return ['all'];
     const cats = new Set(expenses.map(e => e.category || DEFAULT_CATEGORY_KEY));
     return ['all', ...Array.from(cats).sort()];
-  }, [expenses]);
+  }, [expenses, isClient]);
 
   const filteredExpensesForList = useMemo(() => {
+    if (!isClient) return [];
     return expenses.filter(expense => {
       const productMatch = selectedProductFilter === 'all' || expense.product.name === selectedProductFilter;
       const categoryMatch = selectedCategoryFilter === 'all' || (expense.category || DEFAULT_CATEGORY_KEY) === selectedCategoryFilter;
@@ -229,8 +247,6 @@ export default function Home() {
 
       let dateMatch = true;
       if (startDateFilter && endDateFilter) {
-        // Ensure the expenseTimestamp is set to the start of its day for comparison with startDateFilter (which is start of day)
-        // and compare with endOfDay(endDateFilter) to include the entire end date.
         dateMatch = expenseTimestamp >= startDateFilter && expenseTimestamp <= endOfDay(endDateFilter);
       } else if (startDateFilter) {
         dateMatch = expenseTimestamp >= startDateFilter;
@@ -239,11 +255,12 @@ export default function Home() {
       }
       return productMatch && categoryMatch && dateMatch;
     });
-  }, [expenses, selectedProductFilter, selectedCategoryFilter, startDateFilter, endDateFilter]);
+  }, [expenses, selectedProductFilter, selectedCategoryFilter, startDateFilter, endDateFilter, isClient]);
 
   const totalOfFilteredExpenses = useMemo(() => {
+    if (!isClient) return 0;
     return filteredExpensesForList.reduce((sum, expense) => sum + expense.price, 0);
-  }, [filteredExpensesForList]);
+  }, [filteredExpensesForList, isClient]);
 
 
   let activeGroupType: 'product' | 'category' | undefined = undefined;
@@ -251,16 +268,18 @@ export default function Home() {
   let activeGroupDisplayName: string | undefined = undefined;
   let onDeleteActiveGroup: ((identifier: string) => void) | undefined = undefined;
 
-  if (selectedProductFilter !== 'all' && selectedCategoryFilter === 'all' && !startDateFilter && !endDateFilter) {
-    activeGroupType = 'product';
-    activeGroupName = selectedProductFilter;
-    activeGroupDisplayName = selectedProductFilter;
-    onDeleteActiveGroup = handleDeleteProduct;
-  } else if (selectedCategoryFilter !== 'all' && selectedProductFilter === 'all' && !startDateFilter && !endDateFilter) {
-    activeGroupType = 'category';
-    activeGroupName = selectedCategoryFilter;
-    activeGroupDisplayName = selectedCategoryFilter;
-    onDeleteActiveGroup = handleDeleteCategory;
+  if (isClient) {
+    if (selectedProductFilter !== 'all' && selectedCategoryFilter === 'all' && !startDateFilter && !endDateFilter) {
+      activeGroupType = 'product';
+      activeGroupName = selectedProductFilter;
+      activeGroupDisplayName = selectedProductFilter;
+      onDeleteActiveGroup = handleDeleteProduct;
+    } else if (selectedCategoryFilter !== 'all' && selectedProductFilter === 'all' && !startDateFilter && !endDateFilter) {
+      activeGroupType = 'category';
+      activeGroupName = selectedCategoryFilter;
+      activeGroupDisplayName = selectedCategoryFilter;
+      onDeleteActiveGroup = handleDeleteCategory;
+    }
   }
 
 
@@ -339,10 +358,9 @@ export default function Home() {
 
           <TabsContent value="reporting">
             <div className="space-y-4 md:space-y-6">
-              {/* Charts Section */}
               <ExpenseCharts expenses={expenses} />
+              <CategoryCharts expenses={expenses} defaultCategoryKey={DEFAULT_CATEGORY_KEY} />
 
-              {/* Unified History Section */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg sm:text-xl">Historial de Gastos</CardTitle>
@@ -351,7 +369,7 @@ export default function Home() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
                       <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
-                      <Select onValueChange={setSelectedProductFilter} value={selectedProductFilter}>
+                      <Select onValueChange={setSelectedProductFilter} value={selectedProductFilter} disabled={!isClient}>
                         <SelectTrigger id="product-filter-select" className="w-full mt-1">
                           <SelectValue placeholder="Seleccionar Producto">
                             {selectedProductFilter === 'all' ? 'Todos los Productos' : selectedProductFilter}
@@ -368,7 +386,7 @@ export default function Home() {
                     </div>
                     <div>
                       <Label htmlFor="category-filter-select" className="text-xs sm:text-sm">Filtrar por Categoría:</Label>
-                      <Select onValueChange={setSelectedCategoryFilter} value={selectedCategoryFilter}>
+                      <Select onValueChange={setSelectedCategoryFilter} value={selectedCategoryFilter} disabled={!isClient}>
                         <SelectTrigger id="category-filter-select" className="w-full mt-1">
                           <SelectValue placeholder="Seleccionar Categoría">
                             {selectedCategoryFilter === 'all' ? 'Todas las Categorías' : selectedCategoryFilter}
@@ -397,6 +415,7 @@ export default function Home() {
                               "w-full justify-start text-left font-normal mt-1",
                               !startDateFilter && "text-muted-foreground"
                             )}
+                            disabled={!isClient}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {startDateFilter ? formatDateFns(startDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
@@ -423,6 +442,7 @@ export default function Home() {
                               "w-full justify-start text-left font-normal mt-1",
                               !endDateFilter && "text-muted-foreground"
                             )}
+                            disabled={!isClient}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {endDateFilter ? formatDateFns(endDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
@@ -445,21 +465,24 @@ export default function Home() {
 
                   <div className="mt-4 mb-2 text-right">
                     <p className="text-lg font-semibold">
-                      Total Filtrado: {formatCurrency(totalOfFilteredExpenses)}
+                      Total Filtrado: {isClient ? formatCurrency(totalOfFilteredExpenses) : <Skeleton className="h-7 w-32 inline-block" />}
                     </p>
                   </div>
-
-                  <ExpenseList
-                    expenses={filteredExpensesForList}
-                    onDeleteExpense={handleDeleteExpense}
-                    groupName={activeGroupName}
-                    onDeleteGroup={onDeleteActiveGroup}
-                    groupTypeLabel={activeGroupType}
-                    groupDisplayName={activeGroupDisplayName}
-                    title={historyListTitle()}
-                    caption={historyListCaption()}
-                    defaultCategoryKey={DEFAULT_CATEGORY_KEY}
-                  />
+                  {isClient ? (
+                    <ExpenseList
+                      expenses={filteredExpensesForList}
+                      onDeleteExpense={handleDeleteExpense}
+                      groupName={activeGroupName}
+                      onDeleteGroup={onDeleteActiveGroup}
+                      groupTypeLabel={activeGroupType}
+                      groupDisplayName={activeGroupDisplayName}
+                      title={historyListTitle()}
+                      caption={historyListCaption()}
+                      defaultCategoryKey={DEFAULT_CATEGORY_KEY}
+                    />
+                  ) : (
+                     <Skeleton className="h-64 w-full" />
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -491,8 +514,8 @@ export default function Home() {
                   </>
                 ) : (
                   <>
-                    <Skeleton className="h-10 w-full sm:w-auto" />
-                    <Skeleton className="h-10 w-full sm:w-auto" />
+                    <Skeleton className="h-10 w-full sm:w-[150px]" />
+                    <Skeleton className="h-10 w-full sm:w-[170px]" />
                   </>
                 )}
               </CardContent>
@@ -503,4 +526,3 @@ export default function Home() {
     </>
   );
 }
-
