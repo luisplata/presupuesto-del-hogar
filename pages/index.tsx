@@ -31,7 +31,7 @@ import { es } from 'date-fns/locale/es';
 
 const DEFAULT_CATEGORY_KEY = 'no definido';
 
-type QuickRangeValue = '7days' | '30days' | '90days' | 'custom';
+type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
 
 export default function Home() {
   const { toast } = useToast();
@@ -46,7 +46,7 @@ export default function Home() {
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
   const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
-  const [selectedQuickRange, setSelectedQuickRange] = useState<QuickRangeValue>('7days');
+  const [selectedQuickRange, setSelectedQuickRange] = useState<QuickRangeValue>('allTime');
 
 
   useEffect(() => {
@@ -66,7 +66,10 @@ export default function Home() {
     let newStart: Date | null = null;
     let newEnd: Date | null = null;
 
-    if (selectedQuickRange === '7days') {
+    if (selectedQuickRange === 'allTime') {
+      newStart = null;
+      newEnd = null;
+    } else if (selectedQuickRange === '7days') {
       newStart = startOfDay(subDays(today, 6));
       newEnd = endOfDay(today);
     } else if (selectedQuickRange === '30days') {
@@ -292,13 +295,12 @@ export default function Home() {
       if (!expenseTimestamp) return false;
 
       let dateMatch = true;
+      // For date matching, ensure startOfDay and endOfDay are used for comparison if filters are set
       const effectiveStartDate = startDateFilter ? startOfDay(startDateFilter) : null;
       const effectiveEndDate = endDateFilter ? endOfDay(endDateFilter) : null;
-
+      
       if (effectiveStartDate && effectiveEndDate) {
-        // Ensure comparison is inclusive by checking start of expense day vs start of filter day
-        // and end of expense day vs end of filter day, or more simply:
-        dateMatch = expenseTimestamp >= effectiveStartDate && expenseTimestamp <= effectiveEndDate;
+        dateMatch = isWithinInterval(expenseTimestamp, { start: effectiveStartDate, end: effectiveEndDate });
       } else if (effectiveStartDate) {
         dateMatch = expenseTimestamp >= effectiveStartDate;
       } else if (effectiveEndDate) {
@@ -317,12 +319,14 @@ export default function Home() {
   const handleClearFilters = () => {
     setSelectedProductFilter('all');
     setSelectedCategoryFilter('all');
-    setSelectedQuickRange('7days'); // This will trigger the useEffect to set dates
-    // Date pickers will update via the useEffect on selectedQuickRange
+    setSelectedQuickRange('allTime'); // This will trigger the useEffect to set dates to null
   };
   
   const handleDateSelect = (dateSetter: (date: Date | null) => void, date: Date | null) => {
     dateSetter(date);
+    // If both dates become null or a specific date is set, it's custom.
+    // If one is null and other is set, it's also custom.
+    // The only time it's not custom is when selectedQuickRange sets both or sets both to null.
     setSelectedQuickRange('custom');
   };
 
@@ -335,16 +339,15 @@ export default function Home() {
   if (isClient) {
     const isProductFiltered = selectedProductFilter !== 'all';
     const isCategoryFiltered = selectedCategoryFilter !== 'all';
-    const isSpecificProductGroup = isProductFiltered && !isCategoryFiltered && selectedQuickRange === 'custom' && !startDateFilter && !endDateFilter;
-    const isSpecificCategoryGroup = isCategoryFiltered && !isProductFiltered && selectedQuickRange === 'custom' && !startDateFilter && !endDateFilter;
+    // A group is active if only one of product/category is filtered, and no date filters are set (allTime or custom with null dates)
+    const noDateFiltersActive = !startDateFilter && !endDateFilter;
 
-
-    if (isProductFiltered && !isCategoryFiltered && !startDateFilter && !endDateFilter && (selectedQuickRange === 'custom' || (startDateFilter === null && endDateFilter === null ) )) {
+    if (isProductFiltered && !isCategoryFiltered && noDateFiltersActive) {
         activeGroupType = 'product';
         activeGroupName = selectedProductFilter;
         activeGroupDisplayName = selectedProductFilter;
         onDeleteActiveGroup = handleDeleteProduct;
-    } else if (isCategoryFiltered && !isProductFiltered && !startDateFilter && !endDateFilter && (selectedQuickRange === 'custom' || (startDateFilter === null && endDateFilter === null ))) {
+    } else if (isCategoryFiltered && !isProductFiltered && noDateFiltersActive) {
         activeGroupType = 'category';
         activeGroupName = selectedCategoryFilter;
         activeGroupDisplayName = selectedCategoryFilter;
@@ -385,15 +388,40 @@ export default function Home() {
       dateRangeString = ` desde ${formatDateFns(startDateFilter, "PPP", { locale: es })}`;
     } else if (endDateFilter) {
       dateRangeString = ` hasta ${formatDateFns(endDateFilter, "PPP", { locale: es })}`;
+    } else {
+      dateRangeString = " (todo el tiempo)";
     }
     
     return `${baseCaption}${dateRangeString}. Total: ${formatCurrency(totalOfFilteredExpenses)}`;
   };
   
-  // Ensure default date range for graphs if filters are null
-  const todayForGraph = new Date();
-  const graphViewStartDate = startDateFilter ?? startOfDay(subDays(todayForGraph, 6));
-  const graphViewEndDate = endDateFilter ?? endOfDay(todayForGraph);
+  const { minExpenseDateOverall, maxExpenseDateOverall } = useMemo(() => {
+    if (!isClient || expenses.length === 0) {
+      const today = new Date();
+      return { 
+        minExpenseDateOverall: startOfDay(subDays(today, 6)), 
+        maxExpenseDateOverall: endOfDay(today) 
+      };
+    }
+    let minD: Date | null = null;
+    let maxD: Date | null = null;
+    expenses.forEach(expense => {
+      const current = safelyParseDate(expense.timestamp);
+      if (current) {
+        if (minD === null || current < minD) minD = current;
+        if (maxD === null || current > maxD) maxD = current;
+      }
+    });
+    const fallbackStart = startOfDay(subDays(new Date(), 6));
+    const fallbackEnd = endOfDay(new Date());
+    return { 
+      minExpenseDateOverall: minD ? startOfDay(minD) : fallbackStart,
+      maxExpenseDateOverall: maxD ? endOfDay(maxD) : fallbackEnd
+    };
+  }, [expenses, isClient]);
+
+  const graphViewStartDate = startDateFilter ?? minExpenseDateOverall;
+  const graphViewEndDate = endDateFilter ?? maxExpenseDateOverall;
 
 
   return (
@@ -482,6 +510,7 @@ export default function Home() {
                           <SelectValue placeholder="Seleccionar Rango" />
                         </SelectTrigger>
                         <SelectContent>
+                          <SelectItem value="allTime">Todo el tiempo</SelectItem>
                           <SelectItem value="7days">Últimos 7 días</SelectItem>
                           <SelectItem value="30days">Últimos 30 días</SelectItem>
                           <SelectItem value="90days">Últimos 90 días</SelectItem>
@@ -559,8 +588,8 @@ export default function Home() {
               
               <ExpenseCharts 
                 expenses={filteredExpenses} 
-                startDate={graphViewStartDate}
-                endDate={graphViewEndDate}
+                startDate={graphViewStartDate} // Always pass valid dates
+                endDate={graphViewEndDate}     // Always pass valid dates
               />
               <CategoryCharts 
                 expenses={filteredExpenses} 
@@ -582,7 +611,6 @@ export default function Home() {
                       groupTypeLabel={activeGroupType}
                       groupDisplayName={activeGroupDisplayName}
                       defaultCategoryKey={DEFAULT_CATEGORY_KEY}
-                      // Title and caption are now part of CardHeader above
                     />
                   ) : (
                      <Skeleton className="h-64 w-full" />
@@ -630,3 +658,4 @@ export default function Home() {
     </>
   );
 }
+
