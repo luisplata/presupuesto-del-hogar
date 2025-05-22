@@ -1,3 +1,4 @@
+
 // pages/index.tsx
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { ExpenseForm } from '@/components/ExpenseForm';
@@ -204,7 +205,7 @@ export default function Home() {
   const uniqueCategoriesForFilter = useMemo(() => {
     const cats = new Set(expenses.map(e => e.category || DEFAULT_CATEGORY_KEY));
     return ['all', ...Array.from(cats).sort()];
-  }, [expenses, DEFAULT_CATEGORY_KEY]);
+  }, [expenses]);
 
   const filteredExpensesForList = useMemo(() => {
     return expenses.filter(expense => {
@@ -212,7 +213,7 @@ export default function Home() {
       const categoryMatch = selectedCategoryFilter === 'all' || (expense.category || DEFAULT_CATEGORY_KEY) === selectedCategoryFilter;
       return productMatch && categoryMatch;
     });
-  }, [expenses, selectedProductFilter, selectedCategoryFilter, DEFAULT_CATEGORY_KEY]);
+  }, [expenses, selectedProductFilter, selectedCategoryFilter]);
 
   let activeGroupType: 'product' | 'category' | undefined = undefined;
   let activeGroupName: string | undefined = undefined;
@@ -293,6 +294,9 @@ export default function Home() {
 
           <TabsContent value="reporting">
             <div className="space-y-4 md:space-y-6">
+              {/* Charts Section */}
+              <ExpenseCharts expenses={expenses} />
+
               {/* Unified History Section */}
               <Card>
                 <CardHeader>
@@ -349,9 +353,6 @@ export default function Home() {
                   />
                 </CardContent>
               </Card>
-
-              {/* Charts Section */}
-              <ExpenseCharts expenses={expenses} />
             </div>
           </TabsContent>
 
