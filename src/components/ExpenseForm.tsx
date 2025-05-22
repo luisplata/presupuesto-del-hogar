@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, ChangeEvent, useMemo } from 'react'; // Import useMemo
+import { useState, useEffect, ChangeEvent, useMemo, useRef } from 'react'; // Import useRef
 import type { Expense } from '@/types/expense';
 import { formatCurrency, parseCurrency } from "@/lib/dateUtils";
 
@@ -42,6 +42,7 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Local state to hold the formatted price string for the input display
   const [formattedPrice, setFormattedPrice] = useState("");
+  const productInputRef = useRef<HTMLInputElement>(null); // Ref for the product input
 
   // Dynamically create the schema with translations
   const formSchema = useMemo(() => createFormSchema(), []);
@@ -110,6 +111,7 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
       });
       form.reset({ product: "", price: 0, category: "" }); // Reset form with category empty
       setFormattedPrice(formatCurrency(0)); // Reset local formatted price state
+      productInputRef.current?.focus(); // Set focus back to product input
     } catch (error) {
       console.error("Error al agregar gasto:", error);
       toast({
@@ -133,7 +135,11 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
             <FormItem>
               <FormLabel className="text-xs sm:text-sm">Producto</FormLabel>
               <FormControl>
-                <Input placeholder="Ej: Café" {...field} />
+                <Input
+                  placeholder="Ej: Café"
+                  {...field}
+                  ref={productInputRef} // Assign ref to the input
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -194,5 +200,3 @@ export function ExpenseForm({ onAddExpense, categories, defaultCategoryKey }: Ex
     </Form>
   );
 }
-
-    
