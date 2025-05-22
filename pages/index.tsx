@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { ExpenseForm } from '@/components/ExpenseForm';
 import { ExpenseSummary } from '@/components/ExpenseSummary';
-import { ExpenseList } from '@/components/ExpenseList'; // Import ExpenseList directly
+import { ExpenseList } from '@/components/ExpenseList';
 import { ExpenseCharts } from '@/components/ExpenseCharts';
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
-import { safelyParseDate } from '@/lib/dateUtils';
+import { safelyParseDate, formatCurrency } from '@/lib/dateUtils'; // Import formatCurrency
+import { cn } from '@/lib/utils';
 
 import Head from 'next/head';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,11 +17,16 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Upload, Download } from 'lucide-react';
+import { Upload, Download, Calendar as CalendarIcon } from 'lucide-react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format as formatDateFns, endOfDay } from 'date-fns';
+import { es } from 'date-fns/locale/es';
+
 
 const DEFAULT_CATEGORY_KEY = 'no definido';
 
@@ -30,9 +36,13 @@ export default function Home() {
   const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY_KEY]);
   const [isClient, setIsClient] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedProductFilter, setSelectedProductFilter] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
+  const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
+  const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -60,6 +70,7 @@ export default function Home() {
       const timeB = safelyParseDate(b.timestamp)?.getTime() ?? 0;
       return timeB - timeA;
     }));
+    productInputRef.current?.focus();
   };
 
   const handleDeleteExpense = (idToDelete: string) => {
@@ -139,6 +150,7 @@ export default function Home() {
             const price = parseFloat(priceStr);
             const timestamp = safelyParseDate(timestampStr);
 
+
             if (!productName || isNaN(price) || price <= 0 || !timestamp) {
               console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${productName}, Precio: ${priceStr}, Timestamp: ${timestampStr})`);
               errorsFound++;
@@ -211,26 +223,46 @@ export default function Home() {
     return expenses.filter(expense => {
       const productMatch = selectedProductFilter === 'all' || expense.product.name === selectedProductFilter;
       const categoryMatch = selectedCategoryFilter === 'all' || (expense.category || DEFAULT_CATEGORY_KEY) === selectedCategoryFilter;
-      return productMatch && categoryMatch;
+
+      const expenseTimestamp = safelyParseDate(expense.timestamp);
+      if (!expenseTimestamp) return false;
+
+      let dateMatch = true;
+      if (startDateFilter && endDateFilter) {
+        // Ensure the expenseTimestamp is set to the start of its day for comparison with startDateFilter (which is start of day)
+        // and compare with endOfDay(endDateFilter) to include the entire end date.
+        dateMatch = expenseTimestamp >= startDateFilter && expenseTimestamp <= endOfDay(endDateFilter);
+      } else if (startDateFilter) {
+        dateMatch = expenseTimestamp >= startDateFilter;
+      } else if (endDateFilter) {
+        dateMatch = expenseTimestamp <= endOfDay(endDateFilter);
+      }
+      return productMatch && categoryMatch && dateMatch;
     });
-  }, [expenses, selectedProductFilter, selectedCategoryFilter]);
+  }, [expenses, selectedProductFilter, selectedCategoryFilter, startDateFilter, endDateFilter]);
+
+  const totalOfFilteredExpenses = useMemo(() => {
+    return filteredExpensesForList.reduce((sum, expense) => sum + expense.price, 0);
+  }, [filteredExpensesForList]);
+
 
   let activeGroupType: 'product' | 'category' | undefined = undefined;
   let activeGroupName: string | undefined = undefined;
   let activeGroupDisplayName: string | undefined = undefined;
   let onDeleteActiveGroup: ((identifier: string) => void) | undefined = undefined;
 
-  if (selectedProductFilter !== 'all' && selectedCategoryFilter === 'all') {
+  if (selectedProductFilter !== 'all' && selectedCategoryFilter === 'all' && !startDateFilter && !endDateFilter) {
     activeGroupType = 'product';
     activeGroupName = selectedProductFilter;
     activeGroupDisplayName = selectedProductFilter;
     onDeleteActiveGroup = handleDeleteProduct;
-  } else if (selectedCategoryFilter !== 'all' && selectedProductFilter === 'all') {
+  } else if (selectedCategoryFilter !== 'all' && selectedProductFilter === 'all' && !startDateFilter && !endDateFilter) {
     activeGroupType = 'category';
     activeGroupName = selectedCategoryFilter;
     activeGroupDisplayName = selectedCategoryFilter;
     onDeleteActiveGroup = handleDeleteCategory;
   }
+
 
   const historyListTitle = () => {
     if (selectedProductFilter !== 'all' && selectedCategoryFilter !== 'all') {
@@ -246,17 +278,29 @@ export default function Home() {
   };
 
   const historyListCaption = () => {
+    let baseCaption = "";
     if (selectedProductFilter !== 'all' && selectedCategoryFilter !== 'all') {
-      return `Gastos para el producto ${selectedProductFilter} y la categoría ${selectedCategoryFilter}.`;
+      baseCaption = `Gastos para ${selectedProductFilter} en ${selectedCategoryFilter}`;
+    } else if (selectedProductFilter !== 'all') {
+      baseCaption = `Gastos para el producto ${selectedProductFilter}`;
+    } else if (selectedCategoryFilter !== 'all') {
+      baseCaption = `Gastos para la categoría ${selectedCategoryFilter}`;
+    } else {
+      baseCaption = 'Todos los gastos registrados';
     }
-    if (selectedProductFilter !== 'all') {
-      return `Gastos registrados para el producto ${selectedProductFilter}.`;
+
+    let dateRangeString = "";
+    if (startDateFilter && endDateFilter) {
+      dateRangeString = ` entre ${formatDateFns(startDateFilter, "PPP", { locale: es })} y ${formatDateFns(endDateFilter, "PPP", { locale: es })}`;
+    } else if (startDateFilter) {
+      dateRangeString = ` desde ${formatDateFns(startDateFilter, "PPP", { locale: es })}`;
+    } else if (endDateFilter) {
+      dateRangeString = ` hasta ${formatDateFns(endDateFilter, "PPP", { locale: es })}`;
     }
-    if (selectedCategoryFilter !== 'all') {
-      return `Gastos registrados para la categoría ${selectedCategoryFilter}.`;
-    }
-    return 'Todos los gastos registrados.';
+    
+    return `${baseCaption}${dateRangeString}.`;
   };
+
 
   return (
     <>
@@ -284,6 +328,7 @@ export default function Home() {
                   onAddExpense={handleAddExpense}
                   categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)}
                   defaultCategoryKey={DEFAULT_CATEGORY_KEY}
+                  productInputRef={productInputRef}
                 />
               </div>
               <div className="md:col-span-2">
@@ -303,7 +348,7 @@ export default function Home() {
                   <CardTitle className="text-lg sm:text-xl">Historial de Gastos</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 px-4 pb-4 sm:px-6 sm:pb-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
                       <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
                       <Select onValueChange={setSelectedProductFilter} value={selectedProductFilter}>
@@ -338,6 +383,70 @@ export default function Home() {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="start-date-filter" className="text-xs sm:text-sm">Fecha Desde:</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            id="start-date-filter"
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal mt-1",
+                              !startDateFilter && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {startDateFilter ? formatDateFns(startDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={startDateFilter || undefined}
+                            onSelect={(date) => setStartDateFilter(date || null)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                    <div>
+                      <Label htmlFor="end-date-filter" className="text-xs sm:text-sm">Fecha Hasta:</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            id="end-date-filter"
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal mt-1",
+                              !endDateFilter && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {endDateFilter ? formatDateFns(endDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={endDateFilter || undefined}
+                            onSelect={(date) => setEndDateFilter(date || null)}
+                            disabled={(date) =>
+                              startDateFilter ? date < startDateFilter : false
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 mb-2 text-right">
+                    <p className="text-lg font-semibold">
+                      Total Filtrado: {formatCurrency(totalOfFilteredExpenses)}
+                    </p>
                   </div>
 
                   <ExpenseList
@@ -394,3 +503,4 @@ export default function Home() {
     </>
   );
 }
+
