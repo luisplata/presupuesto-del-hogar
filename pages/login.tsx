@@ -34,17 +34,53 @@ export default function LoginPage() {
     },
   });
 
-  const onSubmit = (data: LoginFormValues) => {
-    // SIMULATE LOGIN
-    console.log('Login data:', data);
-    // In a real app, you would call your backend API here.
-    // For now, we'll just simulate a successful login.
-    setCurrentUser({ email: data.email });
-    toast({
-      title: 'Inicio de Sesión Exitoso',
-      description: `Bienvenido de nuevo, ${data.email}`,
-    });
-    router.push('/');
+  const onSubmit = async (data: LoginFormValues) => {
+    form.control._formState.isSubmitting = true;
+    try {
+      const response = await fetch('https://back.presupuesto.peryloth.com/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+        }),
+      });
+
+      const responseData = await response.json();
+
+      if (response.ok && responseData.access_token) {
+        // Login successful, backend returned an access_token
+        // For now, we'll set the current user with the email used for login.
+        // In a real app, you'd store the access_token securely (e.g., HttpOnly cookie or localStorage if appropriate for your auth strategy)
+        // and potentially fetch user details using this token.
+        setCurrentUser({ email: data.email }); // Using email from form as backend doesn't return user details on login
+        toast({
+          title: 'Inicio de Sesión Exitoso',
+          description: `Bienvenido de nuevo, ${data.email}`,
+        });
+        // You might want to store responseData.access_token in localStorage or context here
+        // localStorage.setItem('accessToken', responseData.access_token);
+        router.push('/');
+      } else {
+        // Handle errors (e.g., invalid credentials, validation errors from backend)
+        toast({
+          title: 'Error de Inicio de Sesión',
+          description: responseData.message || responseData.error || `Error ${response.status}: No se pudo iniciar sesión. Verifica tus credenciales.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error en el inicio de sesión:', error);
+      toast({
+        title: 'Error de Red',
+        description: 'No se pudo conectar con el servidor. Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    } finally {
+      form.control._formState.isSubmitting = false;
+    }
   };
 
   return (
