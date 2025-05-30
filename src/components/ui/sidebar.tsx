@@ -185,7 +185,7 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile, open } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
     if (collapsible === "none" && !isMobile) {
       // Desktop, collapsible="none" -> always expanded, fixed.
@@ -202,12 +202,12 @@ const Sidebar = React.forwardRef<
         >
           <div // Placeholder for gap (ensures SidebarInset correctly calculates margin)
             className={cn(
-              "relative h-svh w-[--sidebar-width] bg-transparent",
+              "relative h-svh w-[var(--sidebar-width)] bg-transparent",
             )}
           />
           <div // Actual fixed sidebar
             className={cn(
-              "fixed inset-y-0 z-10 flex h-svh w-[--sidebar-width]",
+              "fixed inset-y-0 z-10 flex h-svh w-[var(--sidebar-width)]",
               side === "left" ? "left-0" : "right-0",
               variant === "floating" || variant === "inset"
                 ? "p-2" 
@@ -350,10 +350,10 @@ SidebarRail.displayName = "SidebarRail"
 
 const SidebarInset = React.forwardRef<
   HTMLDivElement,
-  React.ComponentProps<"main">
+  React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
   return (
-    <main
+    <div
       ref={ref}
       className={cn(
         "relative flex h-full flex-1 flex-col overflow-y-auto bg-background", // Added h-full and overflow-y-auto

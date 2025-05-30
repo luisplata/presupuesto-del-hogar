@@ -808,7 +808,7 @@ function MainLayout() {
             </p>
           </header>
 
-          <main className="flex flex-col flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
+          <main className="flex flex-col flex-1 gap-4 px-4 pt-14 sm:px-6 md:gap-8">
 
             {activeView === 'control' && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
@@ -1097,3 +1097,4 @@ export default function Home() {
 }
 
     
+
