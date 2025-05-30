@@ -262,7 +262,7 @@ const Sidebar = React.forwardRef<
         <div // Placeholder for gap
           className={cn(
             "duration-200 relative h-svh bg-transparent transition-[width] ease-linear",
-            state === "expanded" ? "w-[--sidebar-width]" : "w-[--sidebar-width-icon]",
+            state === "expanded" ? "w-[var(--sidebar-width)]" : "w-[--sidebar-width-icon]",
             variant === "floating" || variant === "inset"
               ? state === "collapsed" ? "w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]" : "w-[--sidebar-width]"
               : "" 
@@ -353,10 +353,10 @@ const SidebarInset = React.forwardRef<
   React.ComponentProps<"div">
 >(({ className, ...props }, ref) => {
   return (
-    <div
+    <div // Changed from <main>
       ref={ref}
       className={cn(
-        "relative flex h-full flex-1 flex-col overflow-y-auto bg-background", // Added h-full and overflow-y-auto
+        "relative flex h-full flex-1 flex-col bg-background", // Removed overflow-y-auto
         // Default variant: margin adjustment for fixed sidebar
         "md:peer-data-[variant=sidebar]:peer-data-[side=left]:peer-data-[state=expanded]:ml-[var(--sidebar-width)]",
         "md:peer-data-[variant=sidebar]:peer-data-[side=right]:peer-data-[state=expanded]:mr-[var(--sidebar-width)]",
