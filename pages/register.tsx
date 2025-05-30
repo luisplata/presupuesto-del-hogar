@@ -13,6 +13,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Head from 'next/head';
 import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft } from 'lucide-react';
 
 const registerSchema = z.object({
   name: z.string().min(1, { message: 'El nombre es requerido.' }),
@@ -42,7 +43,7 @@ export default function RegisterPage() {
   });
 
   const onSubmit = async (data: RegisterFormValues) => {
-    form.control._formState.isSubmitting = true; // Manually set submitting state for react-hook-form
+    form.control._formState.isSubmitting = true; 
     try {
       const response = await fetch('https://back.presupuesto.peryloth.com/api/auth/register', {
         method: 'POST',
@@ -59,7 +60,6 @@ export default function RegisterPage() {
       const responseData = await response.json();
 
       if (response.ok && responseData.user) {
-        // Use user data from the API response
         setCurrentUser({ email: responseData.user.email, name: responseData.user.name });
         toast({
           title: 'Registro Exitoso',
@@ -67,7 +67,6 @@ export default function RegisterPage() {
         });
         router.push('/');
       } else {
-        // Handle errors (e.g., email already exists, validation errors from backend)
         toast({
           title: 'Error de Registro',
           description: responseData.message || `Error ${response.status}: No se pudo completar el registro.`,
@@ -82,7 +81,7 @@ export default function RegisterPage() {
         variant: 'destructive',
       });
     } finally {
-       form.control._formState.isSubmitting = false; // Manually reset submitting state
+       form.control._formState.isSubmitting = false; 
     }
   };
 
@@ -164,6 +163,14 @@ export default function RegisterPage() {
                 Inicia sesión aquí
               </Link>
             </p>
+            <div className="mt-4 text-center">
+              <Link href="/" passHref>
+                <Button variant="link" className="text-sm text-muted-foreground hover:text-primary">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver a la aplicación
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>

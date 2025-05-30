@@ -13,6 +13,7 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Head from 'next/head';
 import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: 'Por favor, introduce un email válido.' }),
@@ -75,11 +76,7 @@ export default function LoginPage() {
         variant: 'destructive',
       });
     } finally {
-      // react-hook-form manages isSubmitting automatically for async onSubmit
-      // but if you need manual control:
-      // form.control._formState.isSubmitting = false;
-      // For this setup, it's usually fine to let RHF handle it.
-      // If it's not resetting, uncomment the line above or use form.reset() if fields should clear
+      form.control._formState.isSubmitting = false;
     }
   };
 
@@ -135,6 +132,14 @@ export default function LoginPage() {
                 Regístrate aquí
               </Link>
             </p>
+            <div className="mt-4 text-center">
+              <Link href="/" passHref>
+                <Button variant="link" className="text-sm text-muted-foreground hover:text-primary">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Volver a la aplicación
+                </Button>
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>
