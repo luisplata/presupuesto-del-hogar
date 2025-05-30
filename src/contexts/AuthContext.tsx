@@ -3,7 +3,7 @@
 import type { User } from '@/types/user';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import type { Dispatch, ReactNode, SetStateAction} from 'react';
-import { createContext, useContext }  from 'react';
+import { createContext, useContext, useState, useEffect }  from 'react';
 
 interface AuthContextType {
   currentUser: User | null;
@@ -15,12 +15,16 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
-  const [loadingAuth, setLoadingAuth] = useLocalStorage<boolean>('loadingAuth', true); // Simulates loading
+  const [loadingAuth, setLoadingAuth] = useState<boolean>(true); // Changed from useLocalStorage
 
-  // Simulate loading delay, in a real app this would be checking session
-  if (typeof window !== 'undefined' && loadingAuth) {
-    setTimeout(() => setLoadingAuth(false), 500);
-  }
+  useEffect(() => {
+    // Simulate initial auth check (e.g., validating a token, checking local session)
+    // For this app, it's mainly to allow localStorage for currentUser to load and provide a brief loading experience.
+    const timer = setTimeout(() => {
+      setLoadingAuth(false);
+    }, 500); // Short delay to simulate async auth check
+    return () => clearTimeout(timer);
+  }, []); // Runs once on mount
 
   return (
     <AuthContext.Provider value={{ currentUser, setCurrentUser, loadingAuth }}>
@@ -36,3 +40,4 @@ export function useAuth() {
   }
   return context;
 }
+
