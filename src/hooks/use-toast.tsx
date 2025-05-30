@@ -156,26 +156,25 @@ function toast({ ...props }: Toast) {
 
   let currentAction = props.action;
 
-  // Logic to add "Copy Error" button for destructive toasts with string descriptions
-  if (!currentAction && props.variant === 'destructive' && typeof props.description === 'string') {
-    const errorMessage = props.description;
+  // Add "Copy" button for toasts with a string description and no existing action
+  if (!currentAction && typeof props.description === 'string' && props.description.trim() !== '') {
+    const messageToCopy = props.description;
     currentAction = (
       <ToastAction
-        altText="Copiar mensaje de error"
+        altText="Copiar descripción"
         onClick={(event) => {
           event.preventDefault(); // Prevent default action if it's part of a form/link
           if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-            navigator.clipboard.writeText(errorMessage)
+            navigator.clipboard.writeText(messageToCopy)
               .catch(err => {
                 console.error("Error al copiar al portapapeles:", err);
-                // Fallback or error message to user if necessary
               });
           } else {
             console.warn("La API del portapapeles no está disponible en este navegador/contexto.");
           }
         }}
       >
-        Copiar Error
+        Copiar
       </ToastAction>
     );
   }
