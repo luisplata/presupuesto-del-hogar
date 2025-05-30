@@ -38,11 +38,11 @@ type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
 
 interface BackendExpense {
   id: number; // Server ID is a number
-  local_id?: string | null; // Client-generated ID, if it was a new item from client
-  productName: string; // Changed from 'product' to 'productName' for consistency
-  price: string; // Backend sends price as string
+  local_id?: string | null; 
+  productName: string; 
+  price: string; 
   category: string;
-  timestamp: string; // Backend sends timestamp as string
+  timestamp: string; 
   updated_at: string;
   deleted_at?: string | null;
 }
@@ -55,7 +55,7 @@ interface BackendCategory {
 interface SyncAllServerDataResponse {
   expenses: BackendExpense[];
   categories: BackendCategory[];
-  productNames: string[]; // Assuming this is an array of strings based on your example
+  productNames: string[]; 
   server_timestamp: string;
 }
 
@@ -435,6 +435,7 @@ export default function Home() {
 
     if (token) {
       try {
+        // No need to await, just fire and forget for logout
         fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
           method: 'POST',
           headers: {
@@ -444,6 +445,7 @@ export default function Home() {
         });
       } catch (error) {
         console.error('Error calling logout endpoint:', error);
+        // Don't block logout if API call fails
       }
     }
 
@@ -457,7 +459,7 @@ export default function Home() {
       title: 'Sesión Cerrada',
       description: 'Has cerrado sesión exitosamente.',
     });
-    router.push('/login');
+    router.push('/login'); // Redirect to login after clearing session
   };
 
 
@@ -477,10 +479,11 @@ export default function Home() {
     // --- PUSH Phase (using replace-all-client-data strategy) ---
     try {
       const clientExpensesPayload = expenses.map(exp => {
+        // ID for existing server items is a string like "1", "23". New items have UUID string.
         const isServerId = !isNaN(parseInt(exp.id, 10));
         return {
-          id: isServerId ? parseInt(exp.id, 10) : null,
-          local_id: isServerId ? null : exp.id,
+          id: isServerId ? exp.id : null, // Send server ID as string if it exists
+          local_id: isServerId ? null : exp.id, // Send UUID as local_id for new items
           product: exp.product.name, 
           price: exp.price,
           category: exp.category || DEFAULT_CATEGORY_KEY,
@@ -500,7 +503,7 @@ export default function Home() {
 
       if (!pushResponse.ok) {
         const errorData = await pushResponse.json().catch(() => ({ message: `Error al enviar cambios (PUSH): ${pushResponse.status}` }));
-        throw new Error(errorData.message || `Error ${pushResponse.status}`);
+        throw new Error(errorData.message || `Error ${pushResponse.status}: ${JSON.stringify(errorData)}`);
       }
 
       const pushResult = await pushResponse.json();
@@ -518,7 +521,6 @@ export default function Home() {
     // --- PULL Phase (using get-all-server-data strategy) ---
     try {
       const syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/get-all-server-data';
-      // No 'since' parameter needed for get-all-server-data
 
       const response = await fetch(syncUrl, {
         method: 'GET',
@@ -543,7 +545,7 @@ export default function Home() {
             return null; 
           }
           return {
-            id: String(be.id), 
+            id: String(be.id), // Store server ID as string
             product: { name: be.productName, value: 0, color: '' }, 
             price: frontendPrice,
             category: be.category || DEFAULT_CATEGORY_KEY,
@@ -561,7 +563,7 @@ export default function Home() {
       setCategories(finalCategories);
       
       setLastSyncTimestamp(syncResponse.server_timestamp);
-      setDeletedServerExpenseIds([]);
+      setDeletedServerExpenseIds([]); // Clear after successful sync (both PUSH and PULL parts for deletions that might use this)
 
       toast({ title: 'Sincronización Completada (Pull All)', description: `${serverExpensesTransformed.length} gastos y ${finalCategories.length} categorías actualizadas desde el servidor.` });
 
@@ -973,3 +975,5 @@ export default function Home() {
     </>
   );
 }
+
+    
