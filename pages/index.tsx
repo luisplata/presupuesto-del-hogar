@@ -38,8 +38,8 @@ type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
 
 interface BackendExpense {
   id: number; // Server ID is a number
-  local_id?: string | null;
-  productName: string;
+  local_id?: string | null; // Client-generated ID, if it was a new item from client
+  productName: string; // Changed from 'product' to 'productName' for consistency
   price: string; // Backend sends price as string
   category: string;
   timestamp: string; // Backend sends timestamp as string
@@ -55,6 +55,7 @@ export default function Home() {
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
   const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY_KEY]);
   const [lastSyncTimestamp, setLastSyncTimestamp] = useLocalStorage<string | null>('lastSyncTimestamp', null);
+  // deletedServerExpenseIds is kept in case a more granular delete strategy is re-introduced, but not used in the current PUSH
   const [deletedServerExpenseIds, setDeletedServerExpenseIds] = useLocalStorage<number[]>('deletedServerExpenseIds', []);
   const [isClient, setIsClient] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -129,9 +130,17 @@ export default function Home() {
   };
 
   const handleDeleteExpense = (idToDelete: string) => {
+    // If the ID is numeric, it's a server ID. Add to a list for potential server-side deletion tracking.
+    // This list is not directly used by the 'replace-all-client-data' PUSH endpoint,
+    // as that strategy implies the server infers deletions.
     const numericId = parseInt(idToDelete, 10);
-    if (!isNaN(numericId) && String(numericId) === idToDelete) { // It's a server ID
-        setDeletedServerExpenseIds(prevIds => [...prevIds, numericId]);
+    if (!isNaN(numericId) && String(numericId) === idToDelete) { 
+        setDeletedServerExpenseIds(prevIds => {
+            if (!prevIds.includes(numericId)) {
+                return [...prevIds, numericId];
+            }
+            return prevIds;
+        });
     }
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.id !== idToDelete));
   };
@@ -173,11 +182,10 @@ export default function Home() {
   };
 
   const handleDeleteProduct = (productNameToDelete: string) => {
-    // When deleting a product, we need to mark associated server expenses for deletion
     const expensesToDelete = expenses.filter(expense => expense.product.name === productNameToDelete);
     expensesToDelete.forEach(expense => {
         const numericId = parseInt(expense.id, 10);
-        if (!isNaN(numericId) && String(numericId) === expense.id) { // It's a server ID
+        if (!isNaN(numericId) && String(numericId) === expense.id) { 
             setDeletedServerExpenseIds(prevIds => {
                 if (!prevIds.includes(numericId)) {
                     return [...prevIds, numericId];
@@ -202,11 +210,10 @@ export default function Home() {
         });
         return;
     }
-    // Mark associated server expenses for deletion
     const expensesToDelete = expenses.filter(expense => expense.category === categoryIdentifierToDelete);
     expensesToDelete.forEach(expense => {
         const numericId = parseInt(expense.id, 10);
-        if (!isNaN(numericId) && String(numericId) === expense.id) { // It's a server ID
+        if (!isNaN(numericId) && String(numericId) === expense.id) { 
              setDeletedServerExpenseIds(prevIds => {
                 if (!prevIds.includes(numericId)) {
                     return [...prevIds, numericId];
@@ -228,7 +235,7 @@ export default function Home() {
   const handleExport = () => {
     if (!isClient) return;
     const dataToExport = expenses.map(exp => ({
-      ID_Frontend: exp.id, // Include frontend ID for reference
+      ID_Frontend: exp.id, 
       Producto: exp.product.name,
       Precio: exp.price,
       Categoria: exp.category,
@@ -281,20 +288,37 @@ export default function Home() {
             let timestamp = safelyParseDate(timestampStr);
             
             if (!timestamp && typeof timestampStr === 'string') {
-                const parts = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})(?::(\d{2}))?/);
+                // Attempt to parse "dd/MM/yyyy HH:mm" or "dd/MM/yyyy HH:mm:ss"
+                const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2}):(\d{2})/);
+                const partsWithoutSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2})/);
+                const parts = partsWithSeconds || partsWithoutSeconds;
+
                 if (parts) {
-                    const isoAttempt = `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${parts[6] || '00'}`;
+                    const day = parts[1];
+                    const month = parts[2];
+                    const year = parts[3];
+                    const hour = parts[4];
+                    const minute = parts[5];
+                    const second = partsWithSeconds ? parts[6] : '00';
+                    const isoAttempt = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
                     timestamp = safelyParseDate(isoAttempt);
+                     if (!isValid(timestamp)) {
+                        console.warn(`Fila ${index + 2}: Falló el intento de parseo de fecha custom: ${timestampStr} -> ${isoAttempt}`);
+                        timestamp = null; // Ensure it's null if still invalid
+                    }
+                } else {
+                    console.warn(`Fila ${index + 2}: Formato de fecha no reconocido al importar: ${timestampStr}`);
                 }
             }
 
-            if (!productName || isNaN(price) || price <= 0 || !timestamp) {
+
+            if (!productName || isNaN(price) || price <= 0 || !timestamp || !isValid(timestamp)) {
               console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${productName}, Precio: ${priceStr}, Timestamp: ${timestampStr}, Fecha Parseada: ${timestamp})`);
               errorsFound++;
               return;
             }
             const newExpense: Expense = {
-              id: row.ID_Frontend || uuidv4(), // Use ID from CSV if present, otherwise new UUID
+              id: row.ID_Frontend || uuidv4(), 
               product: { name: productName, value: 0, color: '' }, 
               price: price,
               category: categoryName,
@@ -365,7 +389,7 @@ export default function Home() {
       const categoryMatch = selectedCategoryFilter === 'all' || (expense.category || DEFAULT_CATEGORY_KEY) === selectedCategoryFilter;
 
       const expenseTimestamp = safelyParseDate(expense.timestamp);
-      if (!expenseTimestamp) return false; 
+      if (!expenseTimestamp || !isValid(expenseTimestamp)) return false; 
 
       let dateMatch = true;
       const effectiveStartDate = startDateFilter ? startOfDay(startDateFilter) : null;
@@ -420,7 +444,7 @@ export default function Home() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('lastSyncTimestamp'); 
-      localStorage.removeItem('deletedServerExpenseIds');
+      localStorage.removeItem('deletedServerExpenseIds'); // Clear this too on logout
     }
     toast({
       title: 'Sesión Cerrada',
@@ -443,82 +467,55 @@ export default function Home() {
       return;
     }
 
-    // --- PUSH Phase ---
+    // --- PUSH Phase (using replace-all-client-data strategy) ---
     try {
-      const createdPayload = expenses
-        .filter(e => isNaN(parseInt(e.id, 10))) // ID is a UUID, so it's local
-        .map(e => ({
-          local_id: e.id,
-          productName: e.product.name,
-          price: e.price,
-          category: e.category || DEFAULT_CATEGORY_KEY,
-          timestamp: e.timestamp instanceof Date ? e.timestamp.toISOString() : new Date(e.timestamp).toISOString(),
-        }));
+      const clientExpensesPayload = expenses.map(exp => {
+        const isServerId = !isNaN(parseInt(exp.id, 10));
+        return {
+          id: isServerId ? parseInt(exp.id, 10) : null,
+          local_id: isServerId ? null : exp.id,
+          product: exp.product.name, // Endpoint expects 'product' as string
+          price: exp.price,
+          category: exp.category || DEFAULT_CATEGORY_KEY,
+          timestamp: exp.timestamp instanceof Date ? exp.timestamp.toISOString() : new Date(exp.timestamp).toISOString(),
+        };
+      });
 
-      const updatedPayload = expenses
-        .filter(e => !isNaN(parseInt(e.id, 10))) // ID is numeric (from server)
-        .map(e => ({
-          id: parseInt(e.id, 10),
-          productName: e.product.name,
-          price: e.price,
-          category: e.category || DEFAULT_CATEGORY_KEY,
-          timestamp: e.timestamp instanceof Date ? e.timestamp.toISOString() : new Date(e.timestamp).toISOString(),
-        }));
-      
-      const pushData = {
-        created: createdPayload,
-        updated: updatedPayload,
-        deleted_ids: deletedServerExpenseIds,
-      };
+      const pushResponse = await fetch('https://back.presupuesto.peryloth.com/api/sync/replace-all-client-data', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ expenses: clientExpensesPayload }),
+      });
 
-      if (pushData.created.length > 0 || pushData.updated.length > 0 || pushData.deleted_ids.length > 0) {
-        const pushResponse = await fetch('https://back.presupuesto.peryloth.com/api/sync/expenses', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          },
-          body: JSON.stringify(pushData),
-        });
-
-        if (!pushResponse.ok) {
-          const errorData = await pushResponse.json().catch(() => ({ message: `Error al enviar cambios: ${pushResponse.status}` }));
-          throw new Error(errorData.message || `Error ${pushResponse.status}`);
-        }
-
-        const pushResult = await pushResponse.json();
-        
-        let currentExpenses = [...expenses]; // Work on a copy
-
-        // Update local IDs with server IDs for created items
-        if (pushResult.created_map && pushResult.created_map.length > 0) {
-          pushResult.created_map.forEach((mapItem: { local_id: string, server_id: number }) => {
-            currentExpenses = currentExpenses.map(exp => 
-              exp.id === mapItem.local_id ? { ...exp, id: String(mapItem.server_id) } : exp
-            );
-          });
-        }
-        setExpenses(currentExpenses); // Apply ID updates before pull
-
-        // Clear deleted IDs that were successfully processed
-        setDeletedServerExpenseIds([]); 
-        toast({ title: 'Cambios Locales Enviados', description: `${pushData.created.length} creados, ${pushData.updated.length} actualizados, ${pushData.deleted_ids.length} eliminados enviados.` });
-      } else {
-        toast({ title: 'Sin cambios locales', description: 'No hay cambios locales para enviar al servidor.' });
+      if (!pushResponse.ok) {
+        const errorData = await pushResponse.json().catch(() => ({ message: `Error al enviar cambios (PUSH): ${pushResponse.status}` }));
+        throw new Error(errorData.message || `Error ${pushResponse.status}`);
       }
 
+      const pushResult = await pushResponse.json();
+      toast({ 
+        title: 'Cambios Locales Enviados (Replace All)', 
+        description: `${pushResult.created_count || 0} creados, ${pushResult.updated_count || 0} actualizados por el servidor.` 
+      });
+      // For this strategy, we don't get a created_map, so ID reconciliation relies on the PULL phase.
+      // We also assume the backend handles deletions by comparing the client's full list.
+      // So, deletedServerExpenseIds is not explicitly sent here.
+
     } catch (error: any) {
-      console.error('Error en la fase PUSH de sincronización:', error);
-      toast({ title: 'Error al Enviar Cambios', description: error.message || 'No se pudo enviar los cambios locales.', variant: 'destructive' });
+      console.error('Error en la fase PUSH de sincronización (Replace All):', error);
+      toast({ title: 'Error al Enviar Cambios (Replace All)', description: error.message || 'No se pudo enviar los cambios locales.', variant: 'destructive' });
       setIsSyncing(false);
       return; // Stop if push fails
     }
 
-    // --- PULL Phase ---
+    // --- PULL Phase (remains the same) ---
     try {
       let syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/expenses';
-      const currentLastSync = lastSyncTimestamp; // Use the timestamp from before this sync started
+      const currentLastSync = lastSyncTimestamp; 
       if (currentLastSync) {
         syncUrl += `?since=${currentLastSync}`;
       }
@@ -529,33 +526,36 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Error del servidor al obtener gastos: ${response.status}` }));
+        const errorData = await response.json().catch(() => ({ message: `Error del servidor al obtener gastos (PULL): ${response.status}` }));
         throw new Error(errorData.message || `Error ${response.status}`);
       }
 
       const syncResponse: { expenses: BackendExpense[], server_timestamp: string } = await response.json();
       
       const serverExpensesTransformed: Expense[] = syncResponse.expenses
-        .filter(be => !be.deleted_at)
+        .filter(be => !be.deleted_at) // Exclude soft-deleted items
         .map(be => {
           const frontendPrice = parseFloat(be.price);
           const frontendTimestamp = safelyParseDate(be.timestamp);
-          if (isNaN(frontendPrice) || !frontendTimestamp || !isValid(frontendTimestamp)) {
+
+          // Additional check for productName
+          if (isNaN(frontendPrice) || !frontendTimestamp || !isValid(frontendTimestamp) || !be.productName) {
             console.warn('Gasto inválido recibido del servidor (PULL):', be);
-            return null;
+            return null; // Skip invalid expense
           }
           return {
-            id: String(be.id), // Ensure ID is string for frontend
-            product: { name: be.productName, value: 0, color: '' },
+            id: String(be.id), // Server ID is primary, ensure it's string
+            product: { name: be.productName, value: 0, color: '' }, // Use productName
             price: frontendPrice,
             category: be.category || DEFAULT_CATEGORY_KEY,
             timestamp: frontendTimestamp,
           };
         })
-        .filter((exp): exp is Expense => exp !== null)
-        .sort((a, b) => (b.timestamp.getTime() - a.timestamp.getTime()));
+        .filter((exp): exp is Expense => exp !== null) // Type guard to filter out nulls
+        .sort((a, b) => (safelyParseDate(b.timestamp)!.getTime() - safelyParseDate(a.timestamp)!.getTime()));
 
-      setExpenses(serverExpensesTransformed); // Replace local with server data after push
+
+      setExpenses(serverExpensesTransformed); // Replace local with server data
       
       const syncedCategories = new Set<string>([DEFAULT_CATEGORY_KEY]);
       serverExpensesTransformed.forEach(exp => {
@@ -565,12 +565,13 @@ export default function Home() {
       });
       setCategories(Array.from(syncedCategories).sort());
       setLastSyncTimestamp(syncResponse.server_timestamp);
+      setDeletedServerExpenseIds([]); // Clear local deleted IDs after a successful PULL
 
-      toast({ title: 'Sincronización Completada', description: `${serverExpensesTransformed.length} gastos actualizados desde el servidor.` });
+      toast({ title: 'Sincronización Completada (Pull)', description: `${serverExpensesTransformed.length} gastos actualizados desde el servidor.` });
 
     } catch (error: any) {
       console.error('Error en la fase PULL de sincronización:', error);
-      toast({ title: 'Error al Obtener Cambios', description: error.message || 'No se pudo obtener datos del servidor.', variant: 'destructive' });
+      toast({ title: 'Error al Obtener Cambios (Pull)', description: error.message || 'No se pudo obtener datos del servidor.', variant: 'destructive' });
     } finally {
       setIsSyncing(false);
     }
@@ -652,7 +653,7 @@ export default function Home() {
     let maxD: Date | null = null;
     expenses.forEach(expense => {
       const current = safelyParseDate(expense.timestamp);
-      if (current) {
+      if (current && isValid(current)) { // Add isValid check here
         if (minD === null || current < minD) minD = current;
         if (maxD === null || current > maxD) maxD = current;
       }
@@ -976,5 +977,3 @@ export default function Home() {
     </>
   );
 }
-
-    
