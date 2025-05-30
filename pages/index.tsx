@@ -6,12 +6,14 @@ import { ExpenseSummary } from '@/components/ExpenseSummary';
 import { ExpenseList } from '@/components/ExpenseList';
 import { ExpenseCharts } from '@/components/ExpenseCharts';
 import { CategoryCharts } from '@/components/CategoryCharts';
-import { EditExpenseDialog } from '@/components/EditExpenseDialog'; // Importar el nuevo diálogo
+import { EditExpenseDialog } from '@/components/EditExpenseDialog';
 import type { Expense } from '@/types/expense';
 import useLocalStorage from '@/hooks/useLocalStorage';
 import { v4 as uuidv4 } from 'uuid';
 import { safelyParseDate, formatCurrency } from '@/lib/dateUtils';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'next/router';
 
 import Head from 'next/head';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, Calendar as CalendarIcon, FilterX } from 'lucide-react';
+import { Upload, Download, Calendar as CalendarIcon, FilterX, LogOut, UserCircle } from 'lucide-react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -36,16 +38,17 @@ type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
 
 export default function Home() {
   const { toast } = useToast();
+  const { currentUser, setCurrentUser, loadingAuth } = useAuth();
+  const router = useRouter();
+
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
   const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY_KEY]);
   const [isClient, setIsClient] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
 
-  // State for editing expense
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
-  // Filters for Reporting Tab
   const [selectedProductFilter, setSelectedProductFilter] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
   const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
@@ -82,6 +85,7 @@ export default function Home() {
       newStart = startOfDay(subDays(today, 89));
       newEnd = endOfDay(today);
     } else if (selectedQuickRange === 'custom') {
+      // For custom, dates are set directly by the date pickers
       return;
     }
     setStartDateFilter(newStart);
@@ -150,7 +154,6 @@ export default function Home() {
     setEditingExpense(null);
   };
 
-
   const handleDeleteProduct = (productNameToDelete: string) => {
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product.name !== productNameToDelete));
     toast({
@@ -177,7 +180,6 @@ export default function Home() {
         description: `Todas las entradas para la categoría "${categoryIdentifierToDelete}" han sido eliminadas, y la categoría ha sido removida de la lista.`,
     });
   };
-
 
   const handleExport = () => {
     if (!isClient) return;
@@ -234,13 +236,16 @@ export default function Home() {
             let timestamp = safelyParseDate(timestampStr);
 
             if (!timestamp && typeof timestampStr === 'string') {
+                // Attempt to parse dd/mm/yyyy hh:mm
                 const parts = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
                 if (parts) {
+                    // parts[0] is full match, parts[1] is dd, parts[2] is mm, parts[3] is yyyy, parts[4] is hh, parts[5] is mm
                     const isoAttempt = `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`;
                     timestamp = safelyParseDate(isoAttempt);
                 }
             }
-            if (!timestamp && typeof timestampStr === 'string') {
+            if (!timestamp && typeof timestampStr === 'string') { // Check again if first attempt failed
+                 // Attempt to parse dd/mm/yyyy hh:mm:ss
                 const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
                 if (partsWithSeconds) {
                     const isoAttemptWithSeconds = `${partsWithSeconds[3]}-${partsWithSeconds[2]}-${partsWithSeconds[1]}T${partsWithSeconds[4]}:${partsWithSeconds[5]}:${partsWithSeconds[6]}`;
@@ -255,7 +260,7 @@ export default function Home() {
             }
             const newExpense: Expense = {
               id: uuidv4(),
-              product: { name: productName, value: 0, color: '' },
+              product: { name: productName, value: 0, color: '' }, // value and color might not be in CSV, set defaults
               price: price,
               category: categoryName,
               timestamp: timestamp,
@@ -287,7 +292,7 @@ export default function Home() {
           });
         } finally {
           if (fileInputRef.current) {
-            fileInputRef.current.value = '';
+            fileInputRef.current.value = ''; // Reset file input
           }
         }
       }
@@ -325,7 +330,7 @@ export default function Home() {
       const categoryMatch = selectedCategoryFilter === 'all' || (expense.category || DEFAULT_CATEGORY_KEY) === selectedCategoryFilter;
 
       const expenseTimestamp = safelyParseDate(expense.timestamp);
-      if (!expenseTimestamp) return false;
+      if (!expenseTimestamp) return false; // Don't include expenses with invalid timestamps
 
       let dateMatch = true;
       const effectiveStartDate = startDateFilter ? startOfDay(startDateFilter) : null;
@@ -342,7 +347,6 @@ export default function Home() {
     });
   }, [expenses, selectedProductFilter, selectedCategoryFilter, startDateFilter, endDateFilter, isClient]);
 
-
   const totalOfFilteredExpenses = useMemo(() => {
     if (!isClient) return 0;
     return filteredExpenses.reduce((sum, expense) => sum + expense.price, 0);
@@ -351,15 +355,26 @@ export default function Home() {
   const handleClearFilters = () => {
     setSelectedProductFilter('all');
     setSelectedCategoryFilter('all');
-    setSelectedQuickRange('allTime'); 
+    // setStartDateFilter(null); // Now handled by quick range
+    // setEndDateFilter(null);   // Now handled by quick range
+    setSelectedQuickRange('allTime'); // This will clear date filters
   };
   
   const handleDateSelect = (dateSetter: (date: Date | null) => void, date: Date | null) => {
     dateSetter(date);
-    setSelectedQuickRange('custom');
+    setSelectedQuickRange('custom'); // Switch to custom when a date is manually picked
   };
 
+  const handleLogout = () => {
+    setCurrentUser(null); // Clear user from context/localStorage
+    toast({
+      title: 'Sesión Cerrada',
+      description: 'Has cerrado sesión exitosamente.',
+    });
+    router.push('/login'); // O a la página principal, que redirigirá a login si es necesario
+  };
 
+  // Logic to determine which group delete button to show in ExpenseList
   let activeGroupType: 'product' | 'category' | undefined = undefined;
   let activeGroupName: string | undefined = undefined;
   let activeGroupDisplayName: string | undefined = undefined;
@@ -368,7 +383,8 @@ export default function Home() {
   if (isClient) {
     const isProductFiltered = selectedProductFilter !== 'all';
     const isCategoryFiltered = selectedCategoryFilter !== 'all';
-    const noDateFiltersActive = !startDateFilter && !endDateFilter;
+    // Only enable group delete if ONLY product OR ONLY category is filtered AND no date filters are active
+    const noDateFiltersActive = !startDateFilter && !endDateFilter; // Or selectedQuickRange === 'allTime'
 
     if (isProductFiltered && !isCategoryFiltered && noDateFiltersActive) {
         activeGroupType = 'product';
@@ -382,7 +398,6 @@ export default function Home() {
         onDeleteActiveGroup = handleDeleteCategory;
     }
   }
-
 
   const historyListTitle = () => {
     if (selectedProductFilter !== 'all' && selectedCategoryFilter !== 'all') {
@@ -423,9 +438,11 @@ export default function Home() {
     return `${baseCaption}${dateRangeString}. Total: ${formatCurrency(totalOfFilteredExpenses)}`;
   };
   
+  // Determine the overall min and max dates from ALL expenses for chart rendering
   const { minExpenseDateOverall, maxExpenseDateOverall } = useMemo(() => {
     if (!isClient || expenses.length === 0) {
       const today = new Date();
+      // Default to last 7 days if no expenses
       return { 
         minExpenseDateOverall: startOfDay(subDays(today, 6)), 
         maxExpenseDateOverall: endOfDay(today) 
@@ -440,7 +457,7 @@ export default function Home() {
         if (maxD === null || current > maxD) maxD = current;
       }
     });
-    const fallbackStart = startOfDay(subDays(new Date(), 6));
+    const fallbackStart = startOfDay(subDays(new Date(), 6)); // Fallback if no valid dates found
     const fallbackEnd = endOfDay(new Date());
     return { 
       minExpenseDateOverall: minD ? startOfDay(minD) : fallbackStart,
@@ -448,9 +465,20 @@ export default function Home() {
     };
   }, [expenses, isClient]);
 
+  // Dates to pass to ExpenseCharts for its X-axis range
+  // If a filter is active, use it. Otherwise, use the overall min/max.
   const graphViewStartDate = startDateFilter ?? minExpenseDateOverall;
   const graphViewEndDate = endDateFilter ?? maxExpenseDateOverall;
 
+
+  if (loadingAuth && isClient) { // Show loading only if client has mounted and auth is still loading
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Skeleton className="h-16 w-16 rounded-full animate-spin" /> {/* Simple spinner */}
+        <p className="ml-4 text-lg">Cargando...</p>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -465,10 +493,11 @@ export default function Home() {
         </header>
 
         <Tabs defaultValue="control" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-6">
+          <TabsList className="grid w-full grid-cols-4 mb-6"> {/* Updated to 4 columns */}
             <TabsTrigger value="control">Control de gastos</TabsTrigger>
             <TabsTrigger value="reporting">Reportería</TabsTrigger>
-            <TabsTrigger value="data">Exportar/Importar Data</TabsTrigger>
+            <TabsTrigger value="data">Exportar/Importar</TabsTrigger>
+            <TabsTrigger value="profile">Perfil</TabsTrigger> {/* New Profile Tab */}
           </TabsList>
 
           <TabsContent value="control">
@@ -494,6 +523,7 @@ export default function Home() {
                   <CardTitle className="text-lg sm:text-xl">Filtros de Reportería</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {/* Product and Category Filters */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
@@ -530,6 +560,7 @@ export default function Home() {
                       </Select>
                     </div>
                   </div>
+                  {/* Date Filters */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
                     <div className="md:col-span-1">
                       <Label htmlFor="quick-range-select" className="text-xs sm:text-sm">Rango Rápido:</Label>
@@ -567,7 +598,7 @@ export default function Home() {
                             <PopoverContent className="w-auto p-0">
                               <Calendar
                                 mode="single"
-                                selected={startDateFilter || undefined}
+                                selected={startDateFilter || undefined} // Pass undefined if null for better component handling
                                 onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
                                 initialFocus
                               />
@@ -606,6 +637,7 @@ export default function Home() {
                         </div>
                     </div>
                   </div>
+                   {/* Clear Filters Button */}
                    <div className="flex justify-end">
                         <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
                             <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
@@ -634,7 +666,7 @@ export default function Home() {
                     <ExpenseList
                       expenses={filteredExpenses}
                       onDeleteExpense={handleDeleteExpense}
-                      onEditExpense={handleEditExpense} // Pasar la nueva función
+                      onEditExpense={handleEditExpense}
                       groupName={activeGroupName}
                       onDeleteGroup={onDeleteActiveGroup}
                       groupTypeLabel={activeGroupType}
@@ -642,7 +674,7 @@ export default function Home() {
                       defaultCategoryKey={DEFAULT_CATEGORY_KEY}
                     />
                   ) : (
-                     <Skeleton className="h-64 w-full" />
+                     <Skeleton className="h-64 w-full" /> // Skeleton for list content
                   )}
                 </CardContent>
               </Card>
@@ -682,6 +714,46 @@ export default function Home() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Profile Tab Content */}
+          <TabsContent value="profile">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <UserCircle className="mr-2 h-6 w-6" /> Perfil de Usuario
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isClient && currentUser ? (
+                  <div className="space-y-3">
+                    <p className="text-lg">
+                      Bienvenido, <span className="font-semibold">{currentUser.name || currentUser.email}</span>!
+                    </p>
+                    <p className="text-sm text-muted-foreground">Email: {currentUser.email}</p>
+                    {/* Add more profile details or actions here */}
+                    <Button onClick={handleLogout} variant="outline" className="w-full sm:w-auto">
+                      <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
+                    </Button>
+                  </div>
+                ) : isClient ? ( // User is not logged in, but client has mounted
+                  <div className="space-y-3 text-center sm:text-left">
+                    <p>Debes iniciar sesión para ver tu perfil y gestionar tus datos.</p>
+                    <Button onClick={() => router.push('/login')} className="w-full sm:w-auto">
+                      <UserCircle className="mr-2 h-4 w-4" /> Ir a Iniciar Sesión
+                    </Button>
+                  </div>
+                ) : (
+                  // Loading state (client not yet mounted or auth still loading)
+                  <div className="space-y-3">
+                    <Skeleton className="h-8 w-3/4" />
+                    <Skeleton className="h-6 w-1/2" />
+                    <Skeleton className="h-10 w-full sm:w-[150px]" />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
         </Tabs>
 
         {editingExpense && isClient && (
@@ -697,3 +769,4 @@ export default function Home() {
     </>
   );
 }
+
