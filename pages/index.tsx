@@ -166,10 +166,11 @@ function MainLayout() {
 
   const handleDeleteExpense = (idToDelete: string) => {
     const expenseToDelete = expenses.find(exp => exp.id === idToDelete);
-    if (expenseToDelete && /^\d+$/.test(expenseToDelete.id)) {
+    if (expenseToDelete && /^\d+$/.test(expenseToDelete.id)) { // Check if ID is numeric (server ID)
         setDeletedServerExpenseIds(prevIds => {
-            if (!prevIds.includes(expenseToDelete.id)) { 
-                return [...prevIds, expenseToDelete.id];
+            const serverId = expenseToDelete.id; // Already a string, or will be if parsed
+            if (!prevIds.includes(serverId)) { 
+                return [...prevIds, serverId];
             }
             return prevIds;
         });
@@ -216,10 +217,11 @@ function MainLayout() {
   const handleDeleteProduct = (productNameToDelete: string) => {
     const expensesToDelete = expenses.filter(expense => expense.product.name === productNameToDelete);
     expensesToDelete.forEach(expense => {
-        if (/^\d+$/.test(expense.id)) {
+        if (/^\d+$/.test(expense.id)) { // Check if ID is numeric (server ID)
             setDeletedServerExpenseIds(prevIds => {
-                if (!prevIds.includes(expense.id)) {
-                    return [...prevIds, expense.id];
+                const serverId = expense.id;
+                if (!prevIds.includes(serverId)) {
+                    return [...prevIds, serverId];
                 }
                 return prevIds;
             });
@@ -243,10 +245,11 @@ function MainLayout() {
     }
     const expensesToDelete = expenses.filter(expense => expense.category === categoryIdentifierToDelete);
     expensesToDelete.forEach(expense => {
-        if (/^\d+$/.test(expense.id)) {
+        if (/^\d+$/.test(expense.id)) { // Check if ID is numeric (server ID)
             setDeletedServerExpenseIds(prevIds => {
-                if (!prevIds.includes(expense.id)) { 
-                    return [...prevIds, expense.id];
+                const serverId = expense.id;
+                if (!prevIds.includes(serverId)) { 
+                    return [...prevIds, serverId];
                 }
                 return prevIds;
             });
@@ -495,9 +498,10 @@ function MainLayout() {
       return;
     }
 
+    // --- PUSH Phase ---
     try {
       const createdPayload = expenses
-        .filter(exp => !/^\d+$/.test(exp.id)) 
+        .filter(exp => !/^\d+$/.test(exp.id)) // Not a numeric ID, so it's new
         .map(exp => {
           const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
           const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -511,12 +515,12 @@ function MainLayout() {
         });
 
       const updatedPayload = expenses
-        .filter(exp => /^\d+$/.test(exp.id)) 
+        .filter(exp => /^\d+$/.test(exp.id)) // Is a numeric ID, so it exists on server
         .map(exp => {
           const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
           const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
           return {
-            id: exp.id, 
+            id: exp.id, // Send as string, backend expects string for existing IDs
             productName: exp.product.name,
             price: exp.price,
             category: exp.category || DEFAULT_CATEGORY_KEY,
@@ -527,9 +531,9 @@ function MainLayout() {
       const pushData = {
         created: createdPayload,
         updated: updatedPayload,
-        deleted_ids: deletedServerExpenseIds,
+        deleted_ids: deletedServerExpenseIds, // Already an array of strings (server IDs)
       };
-
+      
       if (pushData.created.length > 0 || pushData.updated.length > 0 || pushData.deleted_ids.length > 0) {
         const pushResponse = await fetch('https://back.presupuesto.peryloth.com/api/sync/expenses', {
           method: 'POST',
@@ -556,7 +560,7 @@ function MainLayout() {
             );
           });
         }
-        setExpenses(newExpenses); 
+        setExpenses(newExpenses.sort((a, b) => (safelyParseDate(b.timestamp)!.getTime() - safelyParseDate(a.timestamp)!.getTime()))); 
 
         toast({
           title: 'Cambios Locales Sincronizados (PUSH)',
@@ -574,6 +578,7 @@ function MainLayout() {
       return; 
     }
 
+    // --- PULL Phase (Get All Server Data) ---
     try {
       const syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/get-all-server-data';
       const response = await fetch(syncUrl, {
@@ -790,7 +795,7 @@ function MainLayout() {
         </Sidebar>
 
         <SidebarInset>
-          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 sm:py-4">
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:px-6">
             <SidebarTrigger className="sm:hidden"> 
               <Menu className="h-5 w-5" />
               <span className="sr-only">Abrir menú</span>
