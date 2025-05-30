@@ -37,7 +37,7 @@ const DEFAULT_CATEGORY_KEY = 'no definido';
 type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
 
 interface BackendExpense {
-  id: number | string; // Backend might use number, frontend uses string
+  id: number; // Server ID is a number
   local_id?: string | null;
   productName: string;
   price: string; // Backend sends price as string
@@ -55,6 +55,7 @@ export default function Home() {
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
   const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY_KEY]);
   const [lastSyncTimestamp, setLastSyncTimestamp] = useLocalStorage<string | null>('lastSyncTimestamp', null);
+  const [deletedServerExpenseIds, setDeletedServerExpenseIds] = useLocalStorage<number[]>('deletedServerExpenseIds', []);
   const [isClient, setIsClient] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
@@ -108,10 +109,10 @@ export default function Home() {
 
   const handleAddExpense = (newExpenseData: Omit<Expense, 'id' | 'timestamp'>) => {
     const categoryToAdd = newExpenseData.category?.trim() ? newExpenseData.category.trim() : DEFAULT_CATEGORY_KEY;
-    const newExpense = {
+    const newExpense: Expense = {
       ...newExpenseData,
       category: categoryToAdd,
-      id: uuidv4(), // Frontend generated ID
+      id: uuidv4(), // Frontend generated UUID
       timestamp: new Date(),
     };
     if (categoryToAdd !== DEFAULT_CATEGORY_KEY && !categories.includes(categoryToAdd)) {
@@ -128,6 +129,10 @@ export default function Home() {
   };
 
   const handleDeleteExpense = (idToDelete: string) => {
+    const numericId = parseInt(idToDelete, 10);
+    if (!isNaN(numericId) && String(numericId) === idToDelete) { // It's a server ID
+        setDeletedServerExpenseIds(prevIds => [...prevIds, numericId]);
+    }
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.id !== idToDelete));
   };
 
@@ -168,10 +173,23 @@ export default function Home() {
   };
 
   const handleDeleteProduct = (productNameToDelete: string) => {
+    // When deleting a product, we need to mark associated server expenses for deletion
+    const expensesToDelete = expenses.filter(expense => expense.product.name === productNameToDelete);
+    expensesToDelete.forEach(expense => {
+        const numericId = parseInt(expense.id, 10);
+        if (!isNaN(numericId) && String(numericId) === expense.id) { // It's a server ID
+            setDeletedServerExpenseIds(prevIds => {
+                if (!prevIds.includes(numericId)) {
+                    return [...prevIds, numericId];
+                }
+                return prevIds;
+            });
+        }
+    });
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product.name !== productNameToDelete));
     toast({
         title: 'Producto Eliminado',
-        description: `Todas las entradas para el producto "${productNameToDelete}" han sido eliminadas.`,
+        description: `Todas las entradas para el producto "${productNameToDelete}" han sido eliminadas. Se sincronizará la eliminación con el servidor.`,
     });
   };
 
@@ -184,19 +202,33 @@ export default function Home() {
         });
         return;
     }
+    // Mark associated server expenses for deletion
+    const expensesToDelete = expenses.filter(expense => expense.category === categoryIdentifierToDelete);
+    expensesToDelete.forEach(expense => {
+        const numericId = parseInt(expense.id, 10);
+        if (!isNaN(numericId) && String(numericId) === expense.id) { // It's a server ID
+             setDeletedServerExpenseIds(prevIds => {
+                if (!prevIds.includes(numericId)) {
+                    return [...prevIds, numericId];
+                }
+                return prevIds;
+            });
+        }
+    });
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.category !== categoryIdentifierToDelete));
     if (categories.includes(categoryIdentifierToDelete)) {
       setCategories(prev => prev.filter(cat => cat !== categoryIdentifierToDelete));
     }
     toast({
         title: 'Categoría Eliminada',
-        description: `Todas las entradas para la categoría "${categoryIdentifierToDelete}" han sido eliminadas, y la categoría ha sido removida de la lista.`,
+        description: `Todas las entradas para la categoría "${categoryIdentifierToDelete}" han sido eliminadas y la categoría removida. Se sincronizará la eliminación.`,
     });
   };
 
   const handleExport = () => {
     if (!isClient) return;
     const dataToExport = expenses.map(exp => ({
+      ID_Frontend: exp.id, // Include frontend ID for reference
       Producto: exp.product.name,
       Precio: exp.price,
       Categoria: exp.category,
@@ -249,23 +281,12 @@ export default function Home() {
             let timestamp = safelyParseDate(timestampStr);
             
             if (!timestamp && typeof timestampStr === 'string') {
-                // Try DD/MM/YYYY HH:mm format
-                const parts = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
+                const parts = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})(?::(\d{2}))?/);
                 if (parts) {
-                    // Construct YYYY-MM-DDTHH:mm:ss for better ISO parsing
-                    const isoAttempt = `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`;
+                    const isoAttempt = `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:${parts[6] || '00'}`;
                     timestamp = safelyParseDate(isoAttempt);
                 }
             }
-             if (!timestamp && typeof timestampStr === 'string') { 
-                // Try DD/MM/YYYY HH:mm:ss format
-                const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
-                if (partsWithSeconds) {
-                    const isoAttemptWithSeconds = `${partsWithSeconds[3]}-${partsWithSeconds[2]}-${partsWithSeconds[1]}T${partsWithSeconds[4]}:${partsWithSeconds[5]}:${partsWithSeconds[6]}`;
-                    timestamp = safelyParseDate(isoAttemptWithSeconds);
-                }
-            }
-
 
             if (!productName || isNaN(price) || price <= 0 || !timestamp) {
               console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${productName}, Precio: ${priceStr}, Timestamp: ${timestampStr}, Fecha Parseada: ${timestamp})`);
@@ -273,7 +294,7 @@ export default function Home() {
               return;
             }
             const newExpense: Expense = {
-              id: uuidv4(),
+              id: row.ID_Frontend || uuidv4(), // Use ID from CSV if present, otherwise new UUID
               product: { name: productName, value: 0, color: '' }, 
               price: price,
               category: categoryName,
@@ -398,7 +419,8 @@ export default function Home() {
     setCurrentUser(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
-      localStorage.removeItem('lastSyncTimestamp'); // Clear sync timestamp on logout
+      localStorage.removeItem('lastSyncTimestamp'); 
+      localStorage.removeItem('deletedServerExpenseIds');
     }
     toast({
       title: 'Sesión Cerrada',
@@ -410,55 +432,117 @@ export default function Home() {
 
   const handleSyncData = async () => {
     if (!isClient || !currentUser) {
-      toast({
-        title: 'Sincronización Fallida',
-        description: 'Debes iniciar sesión para sincronizar tus datos.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Sincronización Fallida', description: 'Debes iniciar sesión para sincronizar.', variant: 'destructive' });
       return;
     }
     setIsSyncing(true);
     const token = localStorage.getItem('accessToken');
     if (!token) {
-      toast({
-        title: 'Sincronización Fallida',
-        description: 'Token de autenticación no encontrado. Por favor, inicia sesión de nuevo.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Sincronización Fallida', description: 'Token no encontrado. Inicia sesión de nuevo.', variant: 'destructive' });
       setIsSyncing(false);
       return;
     }
 
-    let syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/expenses';
-    if (lastSyncTimestamp) {
-      syncUrl += `?since=${lastSyncTimestamp}`;
+    // --- PUSH Phase ---
+    try {
+      const createdPayload = expenses
+        .filter(e => isNaN(parseInt(e.id, 10))) // ID is a UUID, so it's local
+        .map(e => ({
+          local_id: e.id,
+          productName: e.product.name,
+          price: e.price,
+          category: e.category || DEFAULT_CATEGORY_KEY,
+          timestamp: e.timestamp instanceof Date ? e.timestamp.toISOString() : new Date(e.timestamp).toISOString(),
+        }));
+
+      const updatedPayload = expenses
+        .filter(e => !isNaN(parseInt(e.id, 10))) // ID is numeric (from server)
+        .map(e => ({
+          id: parseInt(e.id, 10),
+          productName: e.product.name,
+          price: e.price,
+          category: e.category || DEFAULT_CATEGORY_KEY,
+          timestamp: e.timestamp instanceof Date ? e.timestamp.toISOString() : new Date(e.timestamp).toISOString(),
+        }));
+      
+      const pushData = {
+        created: createdPayload,
+        updated: updatedPayload,
+        deleted_ids: deletedServerExpenseIds,
+      };
+
+      if (pushData.created.length > 0 || pushData.updated.length > 0 || pushData.deleted_ids.length > 0) {
+        const pushResponse = await fetch('https://back.presupuesto.peryloth.com/api/sync/expenses', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(pushData),
+        });
+
+        if (!pushResponse.ok) {
+          const errorData = await pushResponse.json().catch(() => ({ message: `Error al enviar cambios: ${pushResponse.status}` }));
+          throw new Error(errorData.message || `Error ${pushResponse.status}`);
+        }
+
+        const pushResult = await pushResponse.json();
+        
+        let currentExpenses = [...expenses]; // Work on a copy
+
+        // Update local IDs with server IDs for created items
+        if (pushResult.created_map && pushResult.created_map.length > 0) {
+          pushResult.created_map.forEach((mapItem: { local_id: string, server_id: number }) => {
+            currentExpenses = currentExpenses.map(exp => 
+              exp.id === mapItem.local_id ? { ...exp, id: String(mapItem.server_id) } : exp
+            );
+          });
+        }
+        setExpenses(currentExpenses); // Apply ID updates before pull
+
+        // Clear deleted IDs that were successfully processed
+        setDeletedServerExpenseIds([]); 
+        toast({ title: 'Cambios Locales Enviados', description: `${pushData.created.length} creados, ${pushData.updated.length} actualizados, ${pushData.deleted_ids.length} eliminados enviados.` });
+      } else {
+        toast({ title: 'Sin cambios locales', description: 'No hay cambios locales para enviar al servidor.' });
+      }
+
+    } catch (error: any) {
+      console.error('Error en la fase PUSH de sincronización:', error);
+      toast({ title: 'Error al Enviar Cambios', description: error.message || 'No se pudo enviar los cambios locales.', variant: 'destructive' });
+      setIsSyncing(false);
+      return; // Stop if push fails
     }
 
+    // --- PULL Phase ---
     try {
+      let syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/expenses';
+      const currentLastSync = lastSyncTimestamp; // Use the timestamp from before this sync started
+      if (currentLastSync) {
+        syncUrl += `?since=${currentLastSync}`;
+      }
+
       const response = await fetch(syncUrl, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'application/json',
-        },
+        headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Error del servidor: ${response.status}` }));
+        const errorData = await response.json().catch(() => ({ message: `Error del servidor al obtener gastos: ${response.status}` }));
         throw new Error(errorData.message || `Error ${response.status}`);
       }
 
       const syncResponse: { expenses: BackendExpense[], server_timestamp: string } = await response.json();
       
-      const newExpenses: Expense[] = syncResponse.expenses
-        .filter(be => !be.deleted_at) // Filter out soft-deleted expenses
+      const serverExpensesTransformed: Expense[] = syncResponse.expenses
+        .filter(be => !be.deleted_at)
         .map(be => {
           const frontendPrice = parseFloat(be.price);
           const frontendTimestamp = safelyParseDate(be.timestamp);
-
           if (isNaN(frontendPrice) || !frontendTimestamp || !isValid(frontendTimestamp)) {
-            console.warn('Gasto inválido recibido del servidor:', be);
-            return null; 
+            console.warn('Gasto inválido recibido del servidor (PULL):', be);
+            return null;
           }
           return {
             id: String(be.id), // Ensure ID is string for frontend
@@ -468,36 +552,25 @@ export default function Home() {
             timestamp: frontendTimestamp,
           };
         })
-        .filter((exp): exp is Expense => exp !== null) // Remove nulls from invalid expenses
+        .filter((exp): exp is Expense => exp !== null)
         .sort((a, b) => (b.timestamp.getTime() - a.timestamp.getTime()));
 
-
-      // Simple strategy: replace local with server data for now
-      setExpenses(newExpenses);
-
-      // Update categories based on synced expenses
+      setExpenses(serverExpensesTransformed); // Replace local with server data after push
+      
       const syncedCategories = new Set<string>([DEFAULT_CATEGORY_KEY]);
-      newExpenses.forEach(exp => {
+      serverExpensesTransformed.forEach(exp => {
         if (exp.category && exp.category !== DEFAULT_CATEGORY_KEY) {
           syncedCategories.add(exp.category);
         }
       });
       setCategories(Array.from(syncedCategories).sort());
-
       setLastSyncTimestamp(syncResponse.server_timestamp);
 
-      toast({
-        title: 'Sincronización Exitosa',
-        description: `Se ${newExpenses.length} gastos sincronizados desde el servidor.`,
-      });
+      toast({ title: 'Sincronización Completada', description: `${serverExpensesTransformed.length} gastos actualizados desde el servidor.` });
 
     } catch (error: any) {
-      console.error('Error durante la sincronización:', error);
-      toast({
-        title: 'Error de Sincronización',
-        description: error.message || 'No se pudo conectar con el servidor.',
-        variant: 'destructive',
-      });
+      console.error('Error en la fase PULL de sincronización:', error);
+      toast({ title: 'Error al Obtener Cambios', description: error.message || 'No se pudo obtener datos del servidor.', variant: 'destructive' });
     } finally {
       setIsSyncing(false);
     }
@@ -903,3 +976,5 @@ export default function Home() {
     </>
   );
 }
+
+    
