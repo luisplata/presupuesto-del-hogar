@@ -51,20 +51,16 @@ export default function LoginPage() {
       const responseData = await response.json();
 
       if (response.ok && responseData.access_token) {
-        // Login successful, backend returned an access_token
-        // For now, we'll set the current user with the email used for login.
-        // In a real app, you'd store the access_token securely (e.g., HttpOnly cookie or localStorage if appropriate for your auth strategy)
-        // and potentially fetch user details using this token.
-        setCurrentUser({ email: data.email }); // Using email from form as backend doesn't return user details on login
+        setCurrentUser({ email: data.email }); // Backend doesn't return full user details on login
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('accessToken', responseData.access_token);
+        }
         toast({
           title: 'Inicio de Sesión Exitoso',
           description: `Bienvenido de nuevo, ${data.email}`,
         });
-        // You might want to store responseData.access_token in localStorage or context here
-        // localStorage.setItem('accessToken', responseData.access_token);
         router.push('/');
       } else {
-        // Handle errors (e.g., invalid credentials, validation errors from backend)
         toast({
           title: 'Error de Inicio de Sesión',
           description: responseData.message || responseData.error || `Error ${response.status}: No se pudo iniciar sesión. Verifica tus credenciales.`,
@@ -79,7 +75,11 @@ export default function LoginPage() {
         variant: 'destructive',
       });
     } finally {
-      form.control._formState.isSubmitting = false;
+      // react-hook-form manages isSubmitting automatically for async onSubmit
+      // but if you need manual control:
+      // form.control._formState.isSubmitting = false;
+      // For this setup, it's usually fine to let RHF handle it.
+      // If it's not resetting, uncomment the line above or use form.reset() if fields should clear
     }
   };
 

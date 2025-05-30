@@ -236,16 +236,13 @@ export default function Home() {
             let timestamp = safelyParseDate(timestampStr);
 
             if (!timestamp && typeof timestampStr === 'string') {
-                // Attempt to parse dd/mm/yyyy hh:mm
                 const parts = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
                 if (parts) {
-                    // parts[0] is full match, parts[1] is dd, parts[2] is mm, parts[3] is yyyy, parts[4] is hh, parts[5] is mm
                     const isoAttempt = `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`;
                     timestamp = safelyParseDate(isoAttempt);
                 }
             }
-            if (!timestamp && typeof timestampStr === 'string') { // Check again if first attempt failed
-                 // Attempt to parse dd/mm/yyyy hh:mm:ss
+            if (!timestamp && typeof timestampStr === 'string') { 
                 const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
                 if (partsWithSeconds) {
                     const isoAttemptWithSeconds = `${partsWithSeconds[3]}-${partsWithSeconds[2]}-${partsWithSeconds[1]}T${partsWithSeconds[4]}:${partsWithSeconds[5]}:${partsWithSeconds[6]}`;
@@ -260,7 +257,7 @@ export default function Home() {
             }
             const newExpense: Expense = {
               id: uuidv4(),
-              product: { name: productName, value: 0, color: '' }, // value and color might not be in CSV, set defaults
+              product: { name: productName, value: 0, color: '' }, 
               price: price,
               category: categoryName,
               timestamp: timestamp,
@@ -292,7 +289,7 @@ export default function Home() {
           });
         } finally {
           if (fileInputRef.current) {
-            fileInputRef.current.value = ''; // Reset file input
+            fileInputRef.current.value = ''; 
           }
         }
       }
@@ -330,7 +327,7 @@ export default function Home() {
       const categoryMatch = selectedCategoryFilter === 'all' || (expense.category || DEFAULT_CATEGORY_KEY) === selectedCategoryFilter;
 
       const expenseTimestamp = safelyParseDate(expense.timestamp);
-      if (!expenseTimestamp) return false; // Don't include expenses with invalid timestamps
+      if (!expenseTimestamp) return false; 
 
       let dateMatch = true;
       const effectiveStartDate = startDateFilter ? startOfDay(startDateFilter) : null;
@@ -363,14 +360,36 @@ export default function Home() {
     setSelectedQuickRange('custom'); 
   };
 
-  const handleLogout = () => {
-    setCurrentUser(null); 
+  const handleLogout = async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+
+    if (token) {
+      try {
+        await fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        // Backend logout initiated, client-side cleanup will happen regardless of success
+      } catch (error) {
+        console.error('Error calling logout endpoint:', error);
+        // Still proceed with client-side logout
+      }
+    }
+
+    setCurrentUser(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('accessToken');
+    }
     toast({
       title: 'Sesión Cerrada',
       description: 'Has cerrado sesión exitosamente.',
     });
-    router.push('/login'); 
+    router.push('/login');
   };
+
 
   const handleSyncData = () => {
     // Placeholder for data sync logic
@@ -772,4 +791,3 @@ export default function Home() {
     </>
   );
 }
-
