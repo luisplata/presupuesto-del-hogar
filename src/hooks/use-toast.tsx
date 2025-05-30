@@ -143,6 +143,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">
 
+// This is the main toast function that other parts of the app will call
 function toast({ ...props }: Toast) {
   const id = genId()
 
@@ -155,6 +156,7 @@ function toast({ ...props }: Toast) {
 
   let currentAction = props.action;
 
+  // Logic to add "Copy Error" button for destructive toasts with string descriptions
   if (!currentAction && props.variant === 'destructive' && typeof props.description === 'string') {
     const errorMessage = props.description;
     currentAction = (
@@ -213,7 +215,7 @@ function useToast() {
 
   return {
     ...state,
-    toast,
+    toast, // Expose the main toast function
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
 }
