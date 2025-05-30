@@ -16,12 +16,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/router';
 
 import Head from 'next/head';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, Calendar as CalendarIcon, FilterX, LogOut, UserCircle, RefreshCw } from 'lucide-react';
+import { Upload, Download, Calendar as CalendarIcon, FilterX, LogOut, UserCircle, RefreshCw, ListChecks, BarChartBig, DatabaseZap, Menu } from 'lucide-react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,13 +30,26 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format as formatDateFns, endOfDay, startOfDay, isWithinInterval, subDays, isValid } from 'date-fns';
 import { es } from 'date-fns/locale/es';
 
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+
 
 const DEFAULT_CATEGORY_KEY = 'no definido';
 
 type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
+type ActiveView = 'control' | 'reporting' | 'data' | 'profile';
 
 interface BackendExpense {
-  id: number; // Server ID is a number
+  id: string; // Server ID is a string
   local_id?: string | null; 
   productName: string; 
   price: string; 
@@ -68,7 +80,7 @@ export default function Home() {
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
   const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY_KEY]);
   const [lastSyncTimestamp, setLastSyncTimestamp] = useLocalStorage<string | null>('lastSyncTimestamp', null);
-  const [deletedServerExpenseIds, setDeletedServerExpenseIds] = useLocalStorage<number[]>('deletedServerExpenseIds', []);
+  const [deletedServerExpenseIds, setDeletedServerExpenseIds] = useLocalStorage<string[]>('deletedServerExpenseIds', []);
   const [isClient, setIsClient] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
@@ -81,6 +93,7 @@ export default function Home() {
   const [startDateFilter, setStartDateFilter] = useState<Date | null>(null);
   const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
   const [selectedQuickRange, setSelectedQuickRange] = useState<QuickRangeValue>('allTime');
+  const [activeView, setActiveView] = useState<ActiveView>('control');
 
 
   useEffect(() => {
@@ -142,11 +155,11 @@ export default function Home() {
   };
 
   const handleDeleteExpense = (idToDelete: string) => {
-    const numericId = parseInt(idToDelete, 10);
-    if (!isNaN(numericId) && String(numericId) === idToDelete) { 
+    const expenseToDelete = expenses.find(exp => exp.id === idToDelete);
+    if (expenseToDelete && !isNaN(parseInt(expenseToDelete.id, 10))) {
         setDeletedServerExpenseIds(prevIds => {
-            if (!prevIds.includes(numericId)) {
-                return [...prevIds, numericId];
+            if (!prevIds.includes(expenseToDelete.id)) { // Store string ID
+                return [...prevIds, expenseToDelete.id];
             }
             return prevIds;
         });
@@ -193,11 +206,10 @@ export default function Home() {
   const handleDeleteProduct = (productNameToDelete: string) => {
     const expensesToDelete = expenses.filter(expense => expense.product.name === productNameToDelete);
     expensesToDelete.forEach(expense => {
-        const numericId = parseInt(expense.id, 10);
-        if (!isNaN(numericId) && String(numericId) === expense.id) { 
+        if (!isNaN(parseInt(expense.id, 10))) { 
             setDeletedServerExpenseIds(prevIds => {
-                if (!prevIds.includes(numericId)) {
-                    return [...prevIds, numericId];
+                if (!prevIds.includes(expense.id)) {
+                    return [...prevIds, expense.id];
                 }
                 return prevIds;
             });
@@ -221,11 +233,10 @@ export default function Home() {
     }
     const expensesToDelete = expenses.filter(expense => expense.category === categoryIdentifierToDelete);
     expensesToDelete.forEach(expense => {
-        const numericId = parseInt(expense.id, 10);
-        if (!isNaN(numericId) && String(numericId) === expense.id) { 
+        if (!isNaN(parseInt(expense.id, 10))) { 
              setDeletedServerExpenseIds(prevIds => {
-                if (!prevIds.includes(numericId)) {
-                    return [...prevIds, numericId];
+                if (!prevIds.includes(expense.id)) {
+                    return [...prevIds, expense.id];
                 }
                 return prevIds;
             });
@@ -566,7 +577,7 @@ export default function Home() {
       setCategories(finalCategories);
       
       setLastSyncTimestamp(syncResponse.server_timestamp);
-      setDeletedServerExpenseIds([]); // Clear after successful sync (both PUSH and PULL parts for deletions that might use this)
+      setDeletedServerExpenseIds([]); 
 
       toast({ title: 'Sincronización Completada (Pull All)', description: `${serverExpensesTransformed.length} gastos y ${finalCategories.length} categorías actualizadas desde el servidor.` });
 
@@ -680,290 +691,335 @@ export default function Home() {
     );
   }
 
+  const viewTitles: Record<ActiveView, string> = {
+    control: "Control de Gastos",
+    reporting: "Reportería",
+    data: "Exportar/Importar Data",
+    profile: "Perfil y Sincronización",
+  };
+
+
   return (
     <>
       <Head>
-        <title>Control de Gastos</title>
+        <title>{viewTitles[activeView]} - Control de Gastos</title>
         <meta name="description" content="Registra y analiza tus gastos fácilmente." />
       </Head>
-      <main className="container mx-auto px-2 sm:px-4 py-4 min-h-screen">
-        <header className="mb-6 md:mb-8 text-center relative">
-          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Control de Gastos</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Registra y analiza tus gastos fácilmente.</p>
-        </header>
+      <SidebarProvider>
+        <Sidebar>
+          <SidebarHeader className="p-4">
+            <h2 className="text-xl font-semibold text-sidebar-foreground">Menú Principal</h2>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => setActiveView('control')} isActive={activeView === 'control'} tooltip="Control de Gastos">
+                  <ListChecks />
+                  <span>Control de Gastos</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => setActiveView('reporting')} isActive={activeView === 'reporting'} tooltip="Reportería">
+                  <BarChartBig />
+                  <span>Reportería</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => setActiveView('data')} isActive={activeView === 'data'} tooltip="Exportar/Importar Data">
+                  <DatabaseZap />
+                  <span>Exportar/Importar</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton onClick={() => setActiveView('profile')} isActive={activeView === 'profile'} tooltip="Perfil y Sincronización">
+                  <UserCircle />
+                  <span>Perfil</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarContent>
+        </Sidebar>
 
-        <Tabs defaultValue="control" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6"> 
-            <TabsTrigger value="control">Control de gastos</TabsTrigger>
-            <TabsTrigger value="reporting">Reportería</TabsTrigger>
-            <TabsTrigger value="data">Exportar/Importar</TabsTrigger>
-            <TabsTrigger value="profile">Perfil</TabsTrigger> 
-          </TabsList>
+        <SidebarInset>
+          <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 sm:py-4">
+            <SidebarTrigger className="sm:hidden">
+              <Menu className="h-5 w-5" />
+              <span className="sr-only">Abrir menú</span>
+            </SidebarTrigger>
+            <h1 className="text-xl md:text-2xl font-semibold text-foreground grow">
+              {viewTitles[activeView]}
+            </h1>
+             <p className="text-sm text-muted-foreground hidden md:block">
+              {activeView === 'control' && "Registra y analiza tus gastos fácilmente."}
+            </p>
+          </header>
+          
+          <main className="flex flex-col flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 
-          <TabsContent value="control">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-              <div className="md:col-span-1">
-                <ExpenseForm
-                  onAddExpense={handleAddExpense}
-                  categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)}
-                  defaultCategoryKey={DEFAULT_CATEGORY_KEY}
-                  productInputRef={productInputRef}
+            {activeView === 'control' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                <div className="md:col-span-1">
+                  <ExpenseForm
+                    onAddExpense={handleAddExpense}
+                    categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)}
+                    defaultCategoryKey={DEFAULT_CATEGORY_KEY}
+                    productInputRef={productInputRef}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <ExpenseSummary expenses={expenses} />
+                </div>
+              </div>
+            )}
+
+            {activeView === 'reporting' && (
+              <div className="space-y-4 md:space-y-6">
+                <Card className="mb-4 md:mb-6">
+                  <CardHeader>
+                    <CardTitle className="text-lg sm:text-xl">Filtros de Reportería</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
+                        <Select onValueChange={setSelectedProductFilter} value={selectedProductFilter} disabled={!isClient}>
+                          <SelectTrigger id="product-filter-select" className="w-full mt-1">
+                            <SelectValue placeholder="Seleccionar Producto">
+                              {selectedProductFilter === 'all' ? 'Todos los Productos' : selectedProductFilter}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {uniqueProductsForFilter.map(product => (
+                              <SelectItem key={product} value={product}>
+                                {product === 'all' ? 'Todos los Productos' : product}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="category-filter-select" className="text-xs sm:text-sm">Filtrar por Categoría:</Label>
+                        <Select onValueChange={setSelectedCategoryFilter} value={selectedCategoryFilter} disabled={!isClient}>
+                          <SelectTrigger id="category-filter-select" className="w-full mt-1">
+                            <SelectValue placeholder="Seleccionar Categoría">
+                              {selectedCategoryFilter === 'all' ? 'Todas las Categorías' : selectedCategoryFilter}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {uniqueCategoriesForFilter.map(category => (
+                              <SelectItem key={category} value={category}>
+                                {category === 'all' ? 'Todas las Categorías' : category}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
+                      <div className="md:col-span-1">
+                        <Label htmlFor="quick-range-select" className="text-xs sm:text-sm">Rango Rápido:</Label>
+                        <Select onValueChange={(value) => setSelectedQuickRange(value as QuickRangeValue)} value={selectedQuickRange} disabled={!isClient}>
+                          <SelectTrigger id="quick-range-select" className="w-full mt-1">
+                            <SelectValue placeholder="Seleccionar Rango" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="allTime">Todo el tiempo</SelectItem>
+                            <SelectItem value="7days">Últimos 7 días</SelectItem>
+                            <SelectItem value="30days">Últimos 30 días</SelectItem>
+                            <SelectItem value="90days">Últimos 90 días</SelectItem>
+                            <SelectItem value="custom">Personalizado</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+                          <div>
+                            <Label htmlFor="start-date-filter" className="text-xs sm:text-sm">Fecha Desde:</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  id="start-date-filter"
+                                  variant={"outline"}
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal mt-1",
+                                    !startDateFilter && "text-muted-foreground"
+                                  )}
+                                  disabled={!isClient}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {startDateFilter ? formatDateFns(startDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={startDateFilter || undefined} 
+                                  onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                          <div>
+                            <Label htmlFor="end-date-filter" className="text-xs sm:text-sm">Fecha Hasta:</Label>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  id="end-date-filter"
+                                  variant={"outline"}
+                                  className={cn(
+                                    "w-full justify-start text-left font-normal mt-1",
+                                    !endDateFilter && "text-muted-foreground"
+                                  )}
+                                  disabled={!isClient}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {endDateFilter ? formatDateFns(endDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0">
+                                <Calendar
+                                  mode="single"
+                                  selected={endDateFilter || undefined}
+                                  onSelect={(date) => handleDateSelect(setEndDateFilter, date || null)}
+                                  disabled={(date) =>
+                                    startDateFilter ? date < startDateFilter : false
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                          <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
+                              <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
+                          </Button>
+                      </div>
+                  </CardContent>
+                </Card>
+                
+                <ExpenseCharts 
+                  expenses={filteredExpenses} 
+                  startDate={graphViewStartDate} 
+                  endDate={graphViewEndDate}     
                 />
-              </div>
-              <div className="md:col-span-2">
-                <ExpenseSummary expenses={expenses} />
-              </div>
-            </div>
-          </TabsContent>
+                <CategoryCharts 
+                  expenses={filteredExpenses} 
+                  defaultCategoryKey={DEFAULT_CATEGORY_KEY} 
+                />
 
-          <TabsContent value="reporting">
-            <div className="space-y-4 md:space-y-6">
-              <Card className="mb-4 md:mb-6">
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Filtros de Reportería</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
-                      <Select onValueChange={setSelectedProductFilter} value={selectedProductFilter} disabled={!isClient}>
-                        <SelectTrigger id="product-filter-select" className="w-full mt-1">
-                          <SelectValue placeholder="Seleccionar Producto">
-                            {selectedProductFilter === 'all' ? 'Todos los Productos' : selectedProductFilter}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {uniqueProductsForFilter.map(product => (
-                            <SelectItem key={product} value={product}>
-                              {product === 'all' ? 'Todos los Productos' : product}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="category-filter-select" className="text-xs sm:text-sm">Filtrar por Categoría:</Label>
-                      <Select onValueChange={setSelectedCategoryFilter} value={selectedCategoryFilter} disabled={!isClient}>
-                        <SelectTrigger id="category-filter-select" className="w-full mt-1">
-                          <SelectValue placeholder="Seleccionar Categoría">
-                            {selectedCategoryFilter === 'all' ? 'Todas las Categorías' : selectedCategoryFilter}
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {uniqueCategoriesForFilter.map(category => (
-                            <SelectItem key={category} value={category}>
-                              {category === 'all' ? 'Todas las Categorías' : category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
-                    <div className="md:col-span-1">
-                      <Label htmlFor="quick-range-select" className="text-xs sm:text-sm">Rango Rápido:</Label>
-                      <Select onValueChange={(value) => setSelectedQuickRange(value as QuickRangeValue)} value={selectedQuickRange} disabled={!isClient}>
-                        <SelectTrigger id="quick-range-select" className="w-full mt-1">
-                          <SelectValue placeholder="Seleccionar Rango" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="allTime">Todo el tiempo</SelectItem>
-                          <SelectItem value="7days">Últimos 7 días</SelectItem>
-                          <SelectItem value="30days">Últimos 30 días</SelectItem>
-                          <SelectItem value="90days">Últimos 90 días</SelectItem>
-                          <SelectItem value="custom">Personalizado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                        <div>
-                          <Label htmlFor="start-date-filter" className="text-xs sm:text-sm">Fecha Desde:</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                id="start-date-filter"
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal mt-1",
-                                  !startDateFilter && "text-muted-foreground"
-                                )}
-                                disabled={!isClient}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {startDateFilter ? formatDateFns(startDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={startDateFilter || undefined} 
-                                onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                        <div>
-                          <Label htmlFor="end-date-filter" className="text-xs sm:text-sm">Fecha Hasta:</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                id="end-date-filter"
-                                variant={"outline"}
-                                className={cn(
-                                  "w-full justify-start text-left font-normal mt-1",
-                                  !endDateFilter && "text-muted-foreground"
-                                )}
-                                disabled={!isClient}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {endDateFilter ? formatDateFns(endDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={endDateFilter || undefined}
-                                onSelect={(date) => handleDateSelect(setEndDateFilter, date || null)}
-                                disabled={(date) =>
-                                  startDateFilter ? date < startDateFilter : false
-                                }
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                    </div>
-                  </div>
-                   <div className="flex justify-end">
-                        <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
-                            <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
-                        </Button>
-                    </div>
-                </CardContent>
-              </Card>
-              
-              <ExpenseCharts 
-                expenses={filteredExpenses} 
-                startDate={graphViewStartDate} 
-                endDate={graphViewEndDate}     
-              />
-              <CategoryCharts 
-                expenses={filteredExpenses} 
-                defaultCategoryKey={DEFAULT_CATEGORY_KEY} 
-              />
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg sm:text-xl">{historyListTitle()}</CardTitle>
+                    <CardDescription>{historyListCaption()}</CardDescription>
+                  </CardHeader>
+                  <CardContent className="px-0 sm:px-6 sm:pb-6">
+                    {isClient ? (
+                      <ExpenseList
+                        expenses={filteredExpenses}
+                        onDeleteExpense={handleDeleteExpense}
+                        onEditExpense={handleEditExpense}
+                        groupName={activeGroupName}
+                        onDeleteGroup={onDeleteActiveGroup}
+                        groupTypeLabel={activeGroupType}
+                        groupDisplayName={activeGroupDisplayName}
+                        defaultCategoryKey={DEFAULT_CATEGORY_KEY}
+                      />
+                    ) : (
+                      <Skeleton className="h-64 w-full" /> 
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
+            {activeView === 'data' && (
               <Card>
                 <CardHeader>
-                   <CardTitle className="text-lg sm:text-xl">{historyListTitle()}</CardTitle>
-                   <CardDescription>{historyListCaption()}</CardDescription>
+                  <CardTitle>Exportar/Importar Data (CSV)</CardTitle>
+                  <CardDescription>Exporta tus gastos a un archivo CSV o importa desde uno existente.</CardDescription>
                 </CardHeader>
-                <CardContent className="px-0 sm:px-6 sm:pb-6">
+                <CardContent className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".csv"
+                    style={{ display: 'none' }}
+                    id="import-csv-input"
+                  />
                   {isClient ? (
-                    <ExpenseList
-                      expenses={filteredExpenses}
-                      onDeleteExpense={handleDeleteExpense}
-                      onEditExpense={handleEditExpense}
-                      groupName={activeGroupName}
-                      onDeleteGroup={onDeleteActiveGroup}
-                      groupTypeLabel={activeGroupType}
-                      groupDisplayName={activeGroupDisplayName}
-                      defaultCategoryKey={DEFAULT_CATEGORY_KEY}
-                    />
+                    <>
+                      <Button onClick={handleExport} variant="outline" className="w-full sm:w-auto">
+                        <Download className="mr-2 h-4 w-4" /> Exportar a CSV
+                      </Button>
+                      <Button onClick={handleImportClick} variant="outline" className="w-full sm:w-auto">
+                        <Upload className="mr-2 h-4 w-4" /> Importar desde CSV
+                      </Button>
+                    </>
                   ) : (
-                     <Skeleton className="h-64 w-full" /> 
+                    <>
+                      <Skeleton className="h-10 w-full sm:w-[150px]" />
+                      <Skeleton className="h-10 w-full sm:w-[170px]" />
+                    </>
                   )}
                 </CardContent>
               </Card>
-            </div>
-          </TabsContent>
+            )}
 
-          <TabsContent value="data">
-            <Card>
-              <CardHeader>
-                <CardTitle>Exportar/Importar Data (CSV)</CardTitle>
-                <CardDescription>Exporta tus gastos a un archivo CSV o importa desde uno existente.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col sm:flex-row gap-2 sm:gap-4">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept=".csv"
-                  style={{ display: 'none' }}
-                  id="import-csv-input"
-                />
-                {isClient ? (
-                  <>
-                    <Button onClick={handleExport} variant="outline" className="w-full sm:w-auto">
-                      <Download className="mr-2 h-4 w-4" /> Exportar a CSV
-                    </Button>
-                    <Button onClick={handleImportClick} variant="outline" className="w-full sm:w-auto">
-                      <Upload className="mr-2 h-4 w-4" /> Importar desde CSV
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Skeleton className="h-10 w-full sm:w-[150px]" />
-                    <Skeleton className="h-10 w-full sm:w-[170px]" />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="profile">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <UserCircle className="mr-2 h-6 w-6" /> Perfil y Sincronización
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isClient && currentUser ? (
-                  <div className="space-y-3">
-                    <p className="text-lg">
-                      ¡Bienvenido de nuevo, <span className="font-semibold">{currentUser.name || currentUser.email}</span>!
-                    </p>
-                    <p className="text-sm text-muted-foreground">Email: {currentUser.email}</p>
-                    <Button onClick={handleSyncData} className="w-full sm:w-auto" disabled={isSyncing}>
-                      {isSyncing ? (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Sincronizando...
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4" /> Sincronizar Datos
-                        </>
-                      )}
-                    </Button>
-                    <Button onClick={handleLogout} variant="outline" className="w-full sm:w-auto">
-                      <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
-                    </Button>
-                  </div>
-                ) : isClient ? ( 
-                  <div className="space-y-3 text-center sm:text-left">
-                    <p>Inicia sesión o regístrate para sincronizar tus datos entre dispositivos.</p>
-                    <p className="text-xs text-muted-foreground">
-                      Puedes seguir usando la aplicación localmente sin una cuenta.
-                    </p>
-                    <Button onClick={() => router.push('/login')} className="w-full sm:w-auto">
-                      <UserCircle className="mr-2 h-4 w-4" /> Ir a Iniciar Sesión / Registrarse
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <Skeleton className="h-8 w-3/4" />
-                    <Skeleton className="h-6 w-1/2" />
-                    <Skeleton className="h-10 w-full sm:w-[220px]" />
-                    <Skeleton className="h-10 w-full sm:w-[150px]" />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-        </Tabs>
+            {activeView === 'profile' && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <UserCircle className="mr-2 h-6 w-6" /> Perfil y Sincronización
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isClient && currentUser ? (
+                    <div className="space-y-3">
+                      <p className="text-lg">
+                        ¡Bienvenido de nuevo, <span className="font-semibold">{currentUser.name || currentUser.email}</span>!
+                      </p>
+                      <p className="text-sm text-muted-foreground">Email: {currentUser.email}</p>
+                      <Button onClick={handleSyncData} className="w-full sm:w-auto" disabled={isSyncing}>
+                        {isSyncing ? (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Sincronizando...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Sincronizar Datos
+                          </>
+                        )}
+                      </Button>
+                      <Button onClick={handleLogout} variant="outline" className="w-full sm:w-auto">
+                        <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
+                      </Button>
+                    </div>
+                  ) : isClient ? ( 
+                    <div className="space-y-3 text-center sm:text-left">
+                      <p>Inicia sesión o regístrate para sincronizar tus datos entre dispositivos.</p>
+                      <p className="text-xs text-muted-foreground">
+                        Puedes seguir usando la aplicación localmente sin una cuenta.
+                      </p>
+                      <Button onClick={() => router.push('/login')} className="w-full sm:w-auto">
+                        <UserCircle className="mr-2 h-4 w-4" /> Ir a Iniciar Sesión / Registrarse
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Skeleton className="h-8 w-3/4" />
+                      <Skeleton className="h-6 w-1/2" />
+                      <Skeleton className="h-10 w-full sm:w-[220px]" />
+                      <Skeleton className="h-10 w-full sm:w-[150px]" />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </main>
+        </SidebarInset>
 
         {editingExpense && isClient && (
           <EditExpenseDialog
@@ -974,11 +1030,8 @@ export default function Home() {
             defaultCategoryKey={DEFAULT_CATEGORY_KEY}
           />
         )}
-      </main>
+      </SidebarProvider>
     </>
   );
 }
-
-    
-
     
