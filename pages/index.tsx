@@ -168,7 +168,7 @@ function MainLayout() {
     const expenseToDelete = expenses.find(exp => exp.id === idToDelete);
     if (expenseToDelete && /^\d+$/.test(expenseToDelete.id)) { // Check if ID is numeric (server ID)
         setDeletedServerExpenseIds(prevIds => {
-            const serverId = expenseToDelete.id; // Already a string, or will be if parsed
+            const serverId = expenseToDelete.id; 
             if (!prevIds.includes(serverId)) { 
                 return [...prevIds, serverId];
             }
@@ -501,7 +501,7 @@ function MainLayout() {
     // --- PUSH Phase ---
     try {
       const createdPayload = expenses
-        .filter(exp => !/^\d+$/.test(exp.id)) // Not a numeric ID, so it's new
+        .filter(exp => !/^\d+$/.test(exp.id)) 
         .map(exp => {
           const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
           const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -515,12 +515,12 @@ function MainLayout() {
         });
 
       const updatedPayload = expenses
-        .filter(exp => /^\d+$/.test(exp.id)) // Is a numeric ID, so it exists on server
+        .filter(exp => /^\d+$/.test(exp.id)) 
         .map(exp => {
           const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
           const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
           return {
-            id: exp.id, // Send as string, backend expects string for existing IDs
+            id: exp.id, 
             productName: exp.product.name,
             price: exp.price,
             category: exp.category || DEFAULT_CATEGORY_KEY,
@@ -531,7 +531,7 @@ function MainLayout() {
       const pushData = {
         created: createdPayload,
         updated: updatedPayload,
-        deleted_ids: deletedServerExpenseIds, // Already an array of strings (server IDs)
+        deleted_ids: deletedServerExpenseIds,
       };
       
       if (pushData.created.length > 0 || pushData.updated.length > 0 || pushData.deleted_ids.length > 0) {
@@ -1097,4 +1097,3 @@ export default function Home() {
 }
 
     
-
