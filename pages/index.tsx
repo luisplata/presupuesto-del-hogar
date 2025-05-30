@@ -28,13 +28,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format as formatDateFns, endOfDay, startOfDay, isWithinInterval, subDays } from 'date-fns';
+import { format as formatDateFns, endOfDay, startOfDay, isWithinInterval, subDays, isValid } from 'date-fns';
 import { es } from 'date-fns/locale/es';
 
 
 const DEFAULT_CATEGORY_KEY = 'no definido';
 
 type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
+
+interface BackendExpense {
+  id: number | string; // Backend might use number, frontend uses string
+  local_id?: string | null;
+  productName: string;
+  price: string; // Backend sends price as string
+  category: string;
+  timestamp: string; // Backend sends timestamp as string
+  updated_at: string;
+  deleted_at?: string | null;
+}
 
 export default function Home() {
   const { toast } = useToast();
@@ -43,11 +54,13 @@ export default function Home() {
 
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
   const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY_KEY]);
+  const [lastSyncTimestamp, setLastSyncTimestamp] = useLocalStorage<string | null>('lastSyncTimestamp', null);
   const [isClient, setIsClient] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
 
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [selectedProductFilter, setSelectedProductFilter] = useState<string>('all');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('all');
@@ -98,7 +111,7 @@ export default function Home() {
     const newExpense = {
       ...newExpenseData,
       category: categoryToAdd,
-      id: uuidv4(),
+      id: uuidv4(), // Frontend generated ID
       timestamp: new Date(),
     };
     if (categoryToAdd !== DEFAULT_CATEGORY_KEY && !categories.includes(categoryToAdd)) {
@@ -234,21 +247,25 @@ export default function Home() {
             const timestampStr = row.Timestamp?.trim();
             const price = parseFloat(priceStr);
             let timestamp = safelyParseDate(timestampStr);
-
+            
             if (!timestamp && typeof timestampStr === 'string') {
+                // Try DD/MM/YYYY HH:mm format
                 const parts = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/);
                 if (parts) {
+                    // Construct YYYY-MM-DDTHH:mm:ss for better ISO parsing
                     const isoAttempt = `${parts[3]}-${parts[2]}-${parts[1]}T${parts[4]}:${parts[5]}:00`;
                     timestamp = safelyParseDate(isoAttempt);
                 }
             }
-            if (!timestamp && typeof timestampStr === 'string') { 
+             if (!timestamp && typeof timestampStr === 'string') { 
+                // Try DD/MM/YYYY HH:mm:ss format
                 const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2}):(\d{2})/);
                 if (partsWithSeconds) {
                     const isoAttemptWithSeconds = `${partsWithSeconds[3]}-${partsWithSeconds[2]}-${partsWithSeconds[1]}T${partsWithSeconds[4]}:${partsWithSeconds[5]}:${partsWithSeconds[6]}`;
                     timestamp = safelyParseDate(isoAttemptWithSeconds);
                 }
             }
+
 
             if (!productName || isNaN(price) || price <= 0 || !timestamp) {
               console.warn(`Fila ${index + 2} omitida: Datos inválidos (Producto: ${productName}, Precio: ${priceStr}, Timestamp: ${timestampStr}, Fecha Parseada: ${timestamp})`);
@@ -365,23 +382,23 @@ export default function Home() {
 
     if (token) {
       try {
-        await fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
+        // No await, let it run in background
+        fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
-        // Backend logout initiated, client-side cleanup will happen regardless of success
       } catch (error) {
         console.error('Error calling logout endpoint:', error);
-        // Still proceed with client-side logout
       }
     }
 
     setCurrentUser(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
+      localStorage.removeItem('lastSyncTimestamp'); // Clear sync timestamp on logout
     }
     toast({
       title: 'Sesión Cerrada',
@@ -391,12 +408,99 @@ export default function Home() {
   };
 
 
-  const handleSyncData = () => {
-    // Placeholder for data sync logic
-    toast({
-      title: 'Sincronización (Simulada)',
-      description: '¡Tus datos se están sincronizando! (Esta es una función de marcador de posición)',
-    });
+  const handleSyncData = async () => {
+    if (!isClient || !currentUser) {
+      toast({
+        title: 'Sincronización Fallida',
+        description: 'Debes iniciar sesión para sincronizar tus datos.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsSyncing(true);
+    const token = localStorage.getItem('accessToken');
+    if (!token) {
+      toast({
+        title: 'Sincronización Fallida',
+        description: 'Token de autenticación no encontrado. Por favor, inicia sesión de nuevo.',
+        variant: 'destructive',
+      });
+      setIsSyncing(false);
+      return;
+    }
+
+    let syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/expenses';
+    if (lastSyncTimestamp) {
+      syncUrl += `?since=${lastSyncTimestamp}`;
+    }
+
+    try {
+      const response = await fetch(syncUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: `Error del servidor: ${response.status}` }));
+        throw new Error(errorData.message || `Error ${response.status}`);
+      }
+
+      const syncResponse: { expenses: BackendExpense[], server_timestamp: string } = await response.json();
+      
+      const newExpenses: Expense[] = syncResponse.expenses
+        .filter(be => !be.deleted_at) // Filter out soft-deleted expenses
+        .map(be => {
+          const frontendPrice = parseFloat(be.price);
+          const frontendTimestamp = safelyParseDate(be.timestamp);
+
+          if (isNaN(frontendPrice) || !frontendTimestamp || !isValid(frontendTimestamp)) {
+            console.warn('Gasto inválido recibido del servidor:', be);
+            return null; 
+          }
+          return {
+            id: String(be.id), // Ensure ID is string for frontend
+            product: { name: be.productName, value: 0, color: '' },
+            price: frontendPrice,
+            category: be.category || DEFAULT_CATEGORY_KEY,
+            timestamp: frontendTimestamp,
+          };
+        })
+        .filter((exp): exp is Expense => exp !== null) // Remove nulls from invalid expenses
+        .sort((a, b) => (b.timestamp.getTime() - a.timestamp.getTime()));
+
+
+      // Simple strategy: replace local with server data for now
+      setExpenses(newExpenses);
+
+      // Update categories based on synced expenses
+      const syncedCategories = new Set<string>([DEFAULT_CATEGORY_KEY]);
+      newExpenses.forEach(exp => {
+        if (exp.category && exp.category !== DEFAULT_CATEGORY_KEY) {
+          syncedCategories.add(exp.category);
+        }
+      });
+      setCategories(Array.from(syncedCategories).sort());
+
+      setLastSyncTimestamp(syncResponse.server_timestamp);
+
+      toast({
+        title: 'Sincronización Exitosa',
+        description: `Se ${newExpenses.length} gastos sincronizados desde el servidor.`,
+      });
+
+    } catch (error: any) {
+      console.error('Error durante la sincronización:', error);
+      toast({
+        title: 'Error de Sincronización',
+        description: error.message || 'No se pudo conectar con el servidor.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
 
@@ -747,8 +851,16 @@ export default function Home() {
                       ¡Bienvenido de nuevo, <span className="font-semibold">{currentUser.name || currentUser.email}</span>!
                     </p>
                     <p className="text-sm text-muted-foreground">Email: {currentUser.email}</p>
-                    <Button onClick={handleSyncData} className="w-full sm:w-auto">
-                      <RefreshCw className="mr-2 h-4 w-4" /> Sincronizar Datos (Simulado)
+                    <Button onClick={handleSyncData} className="w-full sm:w-auto" disabled={isSyncing}>
+                      {isSyncing ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Sincronizando...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4" /> Sincronizar Datos
+                        </>
+                      )}
                     </Button>
                     <Button onClick={handleLogout} variant="outline" className="w-full sm:w-auto">
                       <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
