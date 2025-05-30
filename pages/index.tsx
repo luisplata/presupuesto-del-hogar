@@ -40,6 +40,7 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 
@@ -49,12 +50,12 @@ type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
 type ActiveView = 'control' | 'reporting' | 'data' | 'profile';
 
 interface BackendExpense {
-  id: string; // Server ID is a string
-  local_id?: string | null; 
-  productName: string; 
-  price: string; 
+  id: string;
+  local_id?: string | null;
+  productName: string;
+  price: string;
   category: string;
-  timestamp: string; 
+  timestamp: string;
   updated_at: string;
   deleted_at?: string | null;
 }
@@ -67,12 +68,11 @@ interface BackendCategory {
 interface SyncAllServerDataResponse {
   expenses: BackendExpense[];
   categories: BackendCategory[];
-  productNames: string[]; 
+  productNames: string[];
   server_timestamp: string;
 }
 
-
-export default function Home() {
+function MainLayout() {
   const { toast } = useToast();
   const { currentUser, setCurrentUser, loadingAuth } = useAuth();
   const router = useRouter();
@@ -94,6 +94,8 @@ export default function Home() {
   const [endDateFilter, setEndDateFilter] = useState<Date | null>(null);
   const [selectedQuickRange, setSelectedQuickRange] = useState<QuickRangeValue>('allTime');
   const [activeView, setActiveView] = useState<ActiveView>('control');
+
+  const { isMobile, setOpenMobile, setOpen: setSidebarOpen } = useSidebar();
 
 
   useEffect(() => {
@@ -125,7 +127,6 @@ export default function Home() {
       newStart = startOfDay(subDays(today, 89));
       newEnd = endOfDay(today);
     } else if (selectedQuickRange === 'custom') {
-      // For custom, dates are set directly by the date pickers
       return;
     }
     setStartDateFilter(newStart);
@@ -138,7 +139,7 @@ export default function Home() {
     const newExpense: Expense = {
       ...newExpenseData,
       category: categoryToAdd,
-      id: uuidv4(), // Frontend generated UUID
+      id: uuidv4(),
       timestamp: new Date(),
     };
     if (categoryToAdd !== DEFAULT_CATEGORY_KEY && !categories.includes(categoryToAdd)) {
@@ -150,19 +151,20 @@ export default function Home() {
       return timeB - timeA;
     }));
     if (productInputRef.current) {
-        productInputRef.current.focus();
+      productInputRef.current.focus();
     }
   };
 
   const handleDeleteExpense = (idToDelete: string) => {
     const expenseToDelete = expenses.find(exp => exp.id === idToDelete);
     if (expenseToDelete && !isNaN(parseInt(expenseToDelete.id, 10))) {
-        setDeletedServerExpenseIds(prevIds => {
-            if (!prevIds.includes(expenseToDelete.id)) { // Store string ID
-                return [...prevIds, expenseToDelete.id];
-            }
-            return prevIds;
-        });
+      setDeletedServerExpenseIds(prevIds => {
+        const serverId = expenseToDelete.id;
+        if (!prevIds.includes(serverId)) {
+          return [...prevIds, serverId];
+        }
+        return prevIds;
+      });
     }
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.id !== idToDelete));
   };
@@ -206,56 +208,58 @@ export default function Home() {
   const handleDeleteProduct = (productNameToDelete: string) => {
     const expensesToDelete = expenses.filter(expense => expense.product.name === productNameToDelete);
     expensesToDelete.forEach(expense => {
-        if (!isNaN(parseInt(expense.id, 10))) { 
-            setDeletedServerExpenseIds(prevIds => {
-                if (!prevIds.includes(expense.id)) {
-                    return [...prevIds, expense.id];
-                }
-                return prevIds;
-            });
-        }
+      if (!isNaN(parseInt(expense.id, 10))) {
+        const serverId = expense.id;
+        setDeletedServerExpenseIds(prevIds => {
+          if (!prevIds.includes(serverId)) {
+            return [...prevIds, serverId];
+          }
+          return prevIds;
+        });
+      }
     });
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product.name !== productNameToDelete));
     toast({
-        title: 'Producto Eliminado',
-        description: `Todas las entradas para el producto "${productNameToDelete}" han sido eliminadas. Se sincronizará la eliminación con el servidor.`,
+      title: 'Producto Eliminado',
+      description: `Todas las entradas para el producto "${productNameToDelete}" han sido eliminadas. Se sincronizará la eliminación con el servidor.`,
     });
   };
 
   const handleDeleteCategory = (categoryIdentifierToDelete: string) => {
     if (categoryIdentifierToDelete === DEFAULT_CATEGORY_KEY) {
-        toast({
-            title: 'Acción no permitida',
-            description: `La categoría "${DEFAULT_CATEGORY_KEY}" no puede ser eliminada, pero sus gastos sí.`,
-            variant: "destructive",
-        });
-        return;
+      toast({
+        title: 'Acción no permitida',
+        description: `La categoría "${DEFAULT_CATEGORY_KEY}" no puede ser eliminada, pero sus gastos sí.`,
+        variant: "destructive",
+      });
+      return;
     }
     const expensesToDelete = expenses.filter(expense => expense.category === categoryIdentifierToDelete);
     expensesToDelete.forEach(expense => {
-        if (!isNaN(parseInt(expense.id, 10))) { 
-             setDeletedServerExpenseIds(prevIds => {
-                if (!prevIds.includes(expense.id)) {
-                    return [...prevIds, expense.id];
-                }
-                return prevIds;
-            });
-        }
+      if (!isNaN(parseInt(expense.id, 10))) {
+        const serverId = expense.id;
+        setDeletedServerExpenseIds(prevIds => {
+          if (!prevIds.includes(serverId)) {
+            return [...prevIds, serverId];
+          }
+          return prevIds;
+        });
+      }
     });
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.category !== categoryIdentifierToDelete));
     if (categories.includes(categoryIdentifierToDelete)) {
       setCategories(prev => prev.filter(cat => cat !== categoryIdentifierToDelete));
     }
     toast({
-        title: 'Categoría Eliminada',
-        description: `Todas las entradas para la categoría "${categoryIdentifierToDelete}" han sido eliminadas y la categoría removida. Se sincronizará la eliminación.`,
+      title: 'Categoría Eliminada',
+      description: `Todas las entradas para la categoría "${categoryIdentifierToDelete}" han sido eliminadas y la categoría removida. Se sincronizará la eliminación.`,
     });
   };
 
   const handleExport = () => {
     if (!isClient) return;
     const dataToExport = expenses.map(exp => ({
-      ID_Frontend: exp.id, 
+      ID_Frontend: exp.id,
       Producto: exp.product.name,
       Precio: exp.price,
       Categoria: exp.category,
@@ -306,28 +310,28 @@ export default function Home() {
             const timestampStr = row.Timestamp?.trim();
             const price = parseFloat(priceStr);
             let timestamp = safelyParseDate(timestampStr);
-            
-            if (!timestamp && typeof timestampStr === 'string') {
-                const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2}):(\d{2})/);
-                const partsWithoutSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2})/);
-                const parts = partsWithSeconds || partsWithoutSeconds;
 
-                if (parts) {
-                    const day = parts[1];
-                    const month = parts[2];
-                    const year = parts[3];
-                    const hour = parts[4];
-                    const minute = parts[5];
-                    const second = partsWithSeconds ? parts[6] : '00';
-                    const isoAttempt = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
-                    timestamp = safelyParseDate(isoAttempt);
-                     if (!isValid(timestamp)) {
-                        console.warn(`Fila ${index + 2}: Falló el intento de parseo de fecha custom: ${timestampStr} -> ${isoAttempt}`);
-                        timestamp = null; 
-                    }
-                } else {
-                    console.warn(`Fila ${index + 2}: Formato de fecha no reconocido al importar: ${timestampStr}`);
+            if (!timestamp && typeof timestampStr === 'string') {
+              const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2}):(\d{2})/);
+              const partsWithoutSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2})/);
+              const parts = partsWithSeconds || partsWithoutSeconds;
+
+              if (parts) {
+                const day = parts[1];
+                const month = parts[2];
+                const year = parts[3];
+                const hour = parts[4];
+                const minute = parts[5];
+                const second = partsWithSeconds ? parts[6] : '00';
+                const isoAttempt = `${year}-${month}-${day}T${hour}:${minute}:${second}`;
+                timestamp = safelyParseDate(isoAttempt);
+                if (!isValid(timestamp)) {
+                  console.warn(`Fila ${index + 2}: Falló el intento de parseo de fecha custom: ${timestampStr} -> ${isoAttempt}`);
+                  timestamp = null;
                 }
+              } else {
+                console.warn(`Fila ${index + 2}: Formato de fecha no reconocido al importar: ${timestampStr}`);
+              }
             }
 
 
@@ -337,8 +341,8 @@ export default function Home() {
               return;
             }
             const newExpense: Expense = {
-              id: row.ID_Frontend || uuidv4(), 
-              product: { name: productName, value: 0, color: '' }, 
+              id: row.ID_Frontend || uuidv4(),
+              product: { name: productName, value: 0, color: '' },
               price: price,
               category: categoryName,
               timestamp: timestamp,
@@ -370,7 +374,7 @@ export default function Home() {
           });
         } finally {
           if (fileInputRef.current) {
-            fileInputRef.current.value = ''; 
+            fileInputRef.current.value = '';
           }
         }
       }
@@ -408,12 +412,12 @@ export default function Home() {
       const categoryMatch = selectedCategoryFilter === 'all' || (expense.category || DEFAULT_CATEGORY_KEY) === selectedCategoryFilter;
 
       const expenseTimestamp = safelyParseDate(expense.timestamp);
-      if (!expenseTimestamp || !isValid(expenseTimestamp)) return false; 
+      if (!expenseTimestamp || !isValid(expenseTimestamp)) return false;
 
       let dateMatch = true;
       const effectiveStartDate = startDateFilter ? startOfDay(startDateFilter) : null;
       const effectiveEndDate = endDateFilter ? endOfDay(endDateFilter) : null;
-      
+
       if (effectiveStartDate && effectiveEndDate) {
         dateMatch = isWithinInterval(expenseTimestamp, { start: effectiveStartDate, end: effectiveEndDate });
       } else if (effectiveStartDate) {
@@ -433,12 +437,12 @@ export default function Home() {
   const handleClearFilters = () => {
     setSelectedProductFilter('all');
     setSelectedCategoryFilter('all');
-    setSelectedQuickRange('allTime'); 
+    setSelectedQuickRange('allTime');
   };
-  
+
   const handleDateSelect = (dateSetter: (date: Date | null) => void, date: Date | null) => {
     dateSetter(date);
-    setSelectedQuickRange('custom'); 
+    setSelectedQuickRange('custom');
   };
 
   const handleLogout = async () => {
@@ -446,7 +450,6 @@ export default function Home() {
 
     if (token) {
       try {
-        // No need to await, just fire and forget for logout
         fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
           method: 'POST',
           headers: {
@@ -456,21 +459,20 @@ export default function Home() {
         });
       } catch (error) {
         console.error('Error calling logout endpoint:', error);
-        // Don't block logout if API call fails
       }
     }
 
     setCurrentUser(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
-      localStorage.removeItem('lastSyncTimestamp'); 
+      localStorage.removeItem('lastSyncTimestamp');
       localStorage.removeItem('deletedServerExpenseIds');
     }
     toast({
       title: 'Sesión Cerrada',
       description: 'Has cerrado sesión exitosamente.',
     });
-    router.push('/login'); // Redirect to login after clearing session
+    router.push('/login');
   };
 
 
@@ -487,7 +489,6 @@ export default function Home() {
       return;
     }
 
-    // --- PUSH Phase (using replace-all-client-data strategy) ---
     try {
       const clientExpensesPayload = expenses.map(exp => {
         const isServerId = !isNaN(parseInt(exp.id, 10));
@@ -498,7 +499,7 @@ export default function Home() {
         return {
           id: isServerId ? exp.id : null,
           local_id: isServerId ? null : exp.id,
-          product: exp.product.name, 
+          product: exp.product.name,
           price: exp.price,
           category: exp.category || DEFAULT_CATEGORY_KEY,
           timestamp: formattedTimestamp,
@@ -521,18 +522,17 @@ export default function Home() {
       }
 
       const pushResult = await pushResponse.json();
-      toast({ 
-        title: 'Cambios Locales Enviados (Replace All)', 
-        description: `${pushResult.created_count || 0} creados, ${pushResult.updated_count || 0} actualizados por el servidor.` 
+      toast({
+        title: 'Cambios Locales Enviados (Replace All)',
+        description: `${pushResult.created_count || 0} creados, ${pushResult.updated_count || 0} actualizados por el servidor.`
       });
     } catch (error: any) {
       console.error('Error en la fase PUSH de sincronización (Replace All):', error);
       toast({ title: 'Error al Enviar Cambios (Replace All)', description: error.message || 'No se pudo enviar los cambios locales.', variant: 'destructive' });
       setIsSyncing(false);
-      return; 
+      return;
     }
 
-    // --- PULL Phase (using get-all-server-data strategy) ---
     try {
       const syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/get-all-server-data';
 
@@ -547,37 +547,37 @@ export default function Home() {
       }
 
       const syncResponse: SyncAllServerDataResponse = await response.json();
-      
+
       const serverExpensesTransformed: Expense[] = syncResponse.expenses
-        .filter(be => !be.deleted_at) 
+        .filter(be => !be.deleted_at)
         .map(be => {
           const frontendPrice = parseFloat(be.price);
           const frontendTimestamp = safelyParseDate(be.timestamp);
 
           if (isNaN(frontendPrice) || !frontendTimestamp || !isValid(frontendTimestamp) || !be.productName) {
             console.warn('Gasto inválido recibido del servidor (PULL):', be);
-            return null; 
+            return null;
           }
           return {
-            id: String(be.id), // Store server ID as string
-            product: { name: be.productName, value: 0, color: '' }, 
+            id: String(be.id),
+            product: { name: be.productName, value: 0, color: '' },
             price: frontendPrice,
             category: be.category || DEFAULT_CATEGORY_KEY,
             timestamp: frontendTimestamp,
           };
         })
-        .filter((exp): exp is Expense => exp !== null) 
+        .filter((exp): exp is Expense => exp !== null)
         .sort((a, b) => (safelyParseDate(b.timestamp)!.getTime() - safelyParseDate(a.timestamp)!.getTime()));
 
 
-      setExpenses(serverExpensesTransformed); 
-      
+      setExpenses(serverExpensesTransformed);
+
       const serverCategories = syncResponse.categories.map(cat => cat.name);
       const finalCategories = Array.from(new Set([DEFAULT_CATEGORY_KEY, ...serverCategories])).sort();
       setCategories(finalCategories);
-      
+
       setLastSyncTimestamp(syncResponse.server_timestamp);
-      setDeletedServerExpenseIds([]); 
+      setDeletedServerExpenseIds([]);
 
       toast({ title: 'Sincronización Completada (Pull All)', description: `${serverExpensesTransformed.length} gastos y ${finalCategories.length} categorías actualizadas desde el servidor.` });
 
@@ -598,19 +598,19 @@ export default function Home() {
   if (isClient) {
     const isProductFiltered = selectedProductFilter !== 'all';
     const isCategoryFiltered = selectedCategoryFilter !== 'all';
-    
+
     const noDateFiltersActive = selectedQuickRange === 'allTime' && !startDateFilter && !endDateFilter;
 
     if (isProductFiltered && !isCategoryFiltered && noDateFiltersActive) {
-        activeGroupType = 'product';
-        activeGroupName = selectedProductFilter;
-        activeGroupDisplayName = selectedProductFilter;
-        onDeleteActiveGroup = handleDeleteProduct;
+      activeGroupType = 'product';
+      activeGroupName = selectedProductFilter;
+      activeGroupDisplayName = selectedProductFilter;
+      onDeleteActiveGroup = handleDeleteProduct;
     } else if (isCategoryFiltered && !isProductFiltered && noDateFiltersActive) {
-        activeGroupType = 'category';
-        activeGroupName = selectedCategoryFilter;
-        activeGroupDisplayName = selectedCategoryFilter;
-        onDeleteActiveGroup = handleDeleteCategory;
+      activeGroupType = 'category';
+      activeGroupName = selectedCategoryFilter;
+      activeGroupDisplayName = selectedCategoryFilter;
+      onDeleteActiveGroup = handleDeleteCategory;
     }
   }
 
@@ -649,30 +649,30 @@ export default function Home() {
     } else {
       dateRangeString = " (todo el tiempo)";
     }
-    
+
     return `${baseCaption}${dateRangeString}. Total: ${formatCurrency(totalOfFilteredExpenses)}`;
   };
-  
+
   const { minExpenseDateOverall, maxExpenseDateOverall } = useMemo(() => {
     if (!isClient || expenses.length === 0) {
       const today = new Date();
-      return { 
-        minExpenseDateOverall: startOfDay(subDays(today, 6)), 
-        maxExpenseDateOverall: endOfDay(today) 
+      return {
+        minExpenseDateOverall: startOfDay(subDays(today, 6)),
+        maxExpenseDateOverall: endOfDay(today)
       };
     }
     let minD: Date | null = null;
     let maxD: Date | null = null;
     expenses.forEach(expense => {
       const current = safelyParseDate(expense.timestamp);
-      if (current && isValid(current)) { 
+      if (current && isValid(current)) {
         if (minD === null || current < minD) minD = current;
         if (maxD === null || current > maxD) maxD = current;
       }
     });
-    const fallbackStart = startOfDay(subDays(new Date(), 6)); 
+    const fallbackStart = startOfDay(subDays(new Date(), 6));
     const fallbackEnd = endOfDay(new Date());
-    return { 
+    return {
       minExpenseDateOverall: minD ? startOfDay(minD) : fallbackStart,
       maxExpenseDateOverall: maxD ? endOfDay(maxD) : fallbackEnd
     };
@@ -682,10 +682,10 @@ export default function Home() {
   const graphViewEndDate = endDateFilter ?? maxExpenseDateOverall;
 
 
-  if (loadingAuth && isClient) { 
+  if (loadingAuth && isClient) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Skeleton className="h-16 w-16 rounded-full animate-spin" /> 
+        <Skeleton className="h-16 w-16 rounded-full animate-spin" />
         <p className="ml-4 text-lg">Cargando...</p>
       </div>
     );
@@ -699,13 +699,23 @@ export default function Home() {
   };
 
 
+  const handleSidebarItemClick = (view: ActiveView) => {
+    setActiveView(view);
+    if (isMobile) {
+      setOpenMobile(false);
+    } else {
+      setSidebarOpen(false);
+    }
+  };
+
+
   return (
     <>
       <Head>
         <title>{viewTitles[activeView]} - Control de Gastos</title>
         <meta name="description" content="Registra y analiza tus gastos fácilmente." />
       </Head>
-      <SidebarProvider>
+      
         <Sidebar>
           <SidebarHeader className="p-4">
             <h2 className="text-xl font-semibold text-sidebar-foreground">Menú Principal</h2>
@@ -713,25 +723,25 @@ export default function Home() {
           <SidebarContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setActiveView('control')} isActive={activeView === 'control'} tooltip="Control de Gastos">
+                <SidebarMenuButton onClick={() => handleSidebarItemClick('control')} isActive={activeView === 'control'} tooltip="Control de Gastos">
                   <ListChecks />
                   <span>Control de Gastos</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setActiveView('reporting')} isActive={activeView === 'reporting'} tooltip="Reportería">
+                <SidebarMenuButton onClick={() => handleSidebarItemClick('reporting')} isActive={activeView === 'reporting'} tooltip="Reportería">
                   <BarChartBig />
                   <span>Reportería</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setActiveView('data')} isActive={activeView === 'data'} tooltip="Exportar/Importar Data">
+                <SidebarMenuButton onClick={() => handleSidebarItemClick('data')} isActive={activeView === 'data'} tooltip="Exportar/Importar Data">
                   <DatabaseZap />
                   <span>Exportar/Importar</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setActiveView('profile')} isActive={activeView === 'profile'} tooltip="Perfil y Sincronización">
+                <SidebarMenuButton onClick={() => handleSidebarItemClick('profile')} isActive={activeView === 'profile'} tooltip="Perfil y Sincronización">
                   <UserCircle />
                   <span>Perfil</span>
                 </SidebarMenuButton>
@@ -749,11 +759,11 @@ export default function Home() {
             <h1 className="text-xl md:text-2xl font-semibold text-foreground grow">
               {viewTitles[activeView]}
             </h1>
-             <p className="text-sm text-muted-foreground hidden md:block">
+            <p className="text-sm text-muted-foreground hidden md:block">
               {activeView === 'control' && "Registra y analiza tus gastos fácilmente."}
             </p>
           </header>
-          
+
           <main className="flex flex-col flex-1 gap-4 p-4 sm:px-6 sm:py-0 md:gap-8">
 
             {activeView === 'control' && (
@@ -832,81 +842,81 @@ export default function Home() {
                         </Select>
                       </div>
                       <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
-                          <div>
-                            <Label htmlFor="start-date-filter" className="text-xs sm:text-sm">Fecha Desde:</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  id="start-date-filter"
-                                  variant={"outline"}
-                                  className={cn(
-                                    "w-full justify-start text-left font-normal mt-1",
-                                    !startDateFilter && "text-muted-foreground"
-                                  )}
-                                  disabled={!isClient}
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {startDateFilter ? formatDateFns(startDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={startDateFilter || undefined} 
-                                  onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
-                          <div>
-                            <Label htmlFor="end-date-filter" className="text-xs sm:text-sm">Fecha Hasta:</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  id="end-date-filter"
-                                  variant={"outline"}
-                                  className={cn(
-                                    "w-full justify-start text-left font-normal mt-1",
-                                    !endDateFilter && "text-muted-foreground"
-                                  )}
-                                  disabled={!isClient}
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {endDateFilter ? formatDateFns(endDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={endDateFilter || undefined}
-                                  onSelect={(date) => handleDateSelect(setEndDateFilter, date || null)}
-                                  disabled={(date) =>
-                                    startDateFilter ? date < startDateFilter : false
-                                  }
-                                  initialFocus
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
+                        <div>
+                          <Label htmlFor="start-date-filter" className="text-xs sm:text-sm">Fecha Desde:</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="start-date-filter"
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full justify-start text-left font-normal mt-1",
+                                  !startDateFilter && "text-muted-foreground"
+                                )}
+                                disabled={!isClient}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {startDateFilter ? formatDateFns(startDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={startDateFilter || undefined}
+                                onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div>
+                          <Label htmlFor="end-date-filter" className="text-xs sm:text-sm">Fecha Hasta:</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                id="end-date-filter"
+                                variant={"outline"}
+                                className={cn(
+                                  "w-full justify-start text-left font-normal mt-1",
+                                  !endDateFilter && "text-muted-foreground"
+                                )}
+                                disabled={!isClient}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {endDateFilter ? formatDateFns(endDateFilter, "PPP", { locale: es }) : <span>Seleccionar fecha</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={endDateFilter || undefined}
+                                onSelect={(date) => handleDateSelect(setEndDateFilter, date || null)}
+                                disabled={(date) =>
+                                  startDateFilter ? date < startDateFilter : false
+                                }
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
                       </div>
                     </div>
                     <div className="flex justify-end">
-                          <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
-                              <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
-                          </Button>
-                      </div>
+                      <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
+                        <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
-                
-                <ExpenseCharts 
-                  expenses={filteredExpenses} 
-                  startDate={graphViewStartDate} 
-                  endDate={graphViewEndDate}     
+
+                <ExpenseCharts
+                  expenses={filteredExpenses}
+                  startDate={graphViewStartDate}
+                  endDate={graphViewEndDate}
                 />
-                <CategoryCharts 
-                  expenses={filteredExpenses} 
-                  defaultCategoryKey={DEFAULT_CATEGORY_KEY} 
+                <CategoryCharts
+                  expenses={filteredExpenses}
+                  defaultCategoryKey={DEFAULT_CATEGORY_KEY}
                 />
 
                 <Card>
@@ -927,7 +937,7 @@ export default function Home() {
                         defaultCategoryKey={DEFAULT_CATEGORY_KEY}
                       />
                     ) : (
-                      <Skeleton className="h-64 w-full" /> 
+                      <Skeleton className="h-64 w-full" />
                     )}
                   </CardContent>
                 </Card>
@@ -997,7 +1007,7 @@ export default function Home() {
                         <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
                       </Button>
                     </div>
-                  ) : isClient ? ( 
+                  ) : isClient ? (
                     <div className="space-y-3 text-center sm:text-left">
                       <p>Inicia sesión o regístrate para sincronizar tus datos entre dispositivos.</p>
                       <p className="text-xs text-muted-foreground">
@@ -1030,8 +1040,16 @@ export default function Home() {
             defaultCategoryKey={DEFAULT_CATEGORY_KEY}
           />
         )}
-      </SidebarProvider>
     </>
   );
 }
+
+export default function Home() {
+  return (
+    <SidebarProvider>
+      <MainLayout />
+    </SidebarProvider>
+  );
+}
+
     
