@@ -479,15 +479,18 @@ export default function Home() {
     // --- PUSH Phase (using replace-all-client-data strategy) ---
     try {
       const clientExpensesPayload = expenses.map(exp => {
-        // ID for existing server items is a string like "1", "23". New items have UUID string.
         const isServerId = !isNaN(parseInt(exp.id, 10));
+        const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
+        const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+
         return {
-          id: isServerId ? exp.id : null, // Send server ID as string if it exists
-          local_id: isServerId ? null : exp.id, // Send UUID as local_id for new items
+          id: isServerId ? exp.id : null,
+          local_id: isServerId ? null : exp.id,
           product: exp.product.name, 
           price: exp.price,
           category: exp.category || DEFAULT_CATEGORY_KEY,
-          timestamp: exp.timestamp instanceof Date ? exp.timestamp.toISOString() : new Date(exp.timestamp).toISOString(),
+          timestamp: formattedTimestamp,
         };
       });
 
@@ -975,5 +978,7 @@ export default function Home() {
     </>
   );
 }
+
+    
 
     
