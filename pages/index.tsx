@@ -47,6 +47,19 @@ interface BackendExpense {
   deleted_at?: string | null;
 }
 
+interface BackendCategory {
+  id: number;
+  name: string;
+}
+
+interface SyncAllServerDataResponse {
+  expenses: BackendExpense[];
+  categories: BackendCategory[];
+  productNames: string[]; // Assuming this is an array of strings based on your example
+  server_timestamp: string;
+}
+
+
 export default function Home() {
   const { toast } = useToast();
   const { currentUser, setCurrentUser, loadingAuth } = useAuth();
@@ -55,7 +68,6 @@ export default function Home() {
   const [expenses, setExpenses] = useLocalStorage<Expense[]>('expenses', []);
   const [categories, setCategories] = useLocalStorage<string[]>('categories', [DEFAULT_CATEGORY_KEY]);
   const [lastSyncTimestamp, setLastSyncTimestamp] = useLocalStorage<string | null>('lastSyncTimestamp', null);
-  // deletedServerExpenseIds is kept in case a more granular delete strategy is re-introduced, but not used in the current PUSH
   const [deletedServerExpenseIds, setDeletedServerExpenseIds] = useLocalStorage<number[]>('deletedServerExpenseIds', []);
   const [isClient, setIsClient] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,9 +142,6 @@ export default function Home() {
   };
 
   const handleDeleteExpense = (idToDelete: string) => {
-    // If the ID is numeric, it's a server ID. Add to a list for potential server-side deletion tracking.
-    // This list is not directly used by the 'replace-all-client-data' PUSH endpoint,
-    // as that strategy implies the server infers deletions.
     const numericId = parseInt(idToDelete, 10);
     if (!isNaN(numericId) && String(numericId) === idToDelete) { 
         setDeletedServerExpenseIds(prevIds => {
@@ -288,7 +297,6 @@ export default function Home() {
             let timestamp = safelyParseDate(timestampStr);
             
             if (!timestamp && typeof timestampStr === 'string') {
-                // Attempt to parse "dd/MM/yyyy HH:mm" or "dd/MM/yyyy HH:mm:ss"
                 const partsWithSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2}):(\d{2})/);
                 const partsWithoutSeconds = timestampStr.match(/(\d{2})\/(\d{2})\/(\d{4})\s(\d{2}):(\d{2})/);
                 const parts = partsWithSeconds || partsWithoutSeconds;
@@ -304,7 +312,7 @@ export default function Home() {
                     timestamp = safelyParseDate(isoAttempt);
                      if (!isValid(timestamp)) {
                         console.warn(`Fila ${index + 2}: Falló el intento de parseo de fecha custom: ${timestampStr} -> ${isoAttempt}`);
-                        timestamp = null; // Ensure it's null if still invalid
+                        timestamp = null; 
                     }
                 } else {
                     console.warn(`Fila ${index + 2}: Formato de fecha no reconocido al importar: ${timestampStr}`);
@@ -427,7 +435,6 @@ export default function Home() {
 
     if (token) {
       try {
-        // No await, let it run in background
         fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
           method: 'POST',
           headers: {
@@ -444,7 +451,7 @@ export default function Home() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('lastSyncTimestamp'); 
-      localStorage.removeItem('deletedServerExpenseIds'); // Clear this too on logout
+      localStorage.removeItem('deletedServerExpenseIds');
     }
     toast({
       title: 'Sesión Cerrada',
@@ -474,7 +481,7 @@ export default function Home() {
         return {
           id: isServerId ? parseInt(exp.id, 10) : null,
           local_id: isServerId ? null : exp.id,
-          product: exp.product.name, // Endpoint expects 'product' as string
+          product: exp.product.name, 
           price: exp.price,
           category: exp.category || DEFAULT_CATEGORY_KEY,
           timestamp: exp.timestamp instanceof Date ? exp.timestamp.toISOString() : new Date(exp.timestamp).toISOString(),
@@ -501,24 +508,17 @@ export default function Home() {
         title: 'Cambios Locales Enviados (Replace All)', 
         description: `${pushResult.created_count || 0} creados, ${pushResult.updated_count || 0} actualizados por el servidor.` 
       });
-      // For this strategy, we don't get a created_map, so ID reconciliation relies on the PULL phase.
-      // We also assume the backend handles deletions by comparing the client's full list.
-      // So, deletedServerExpenseIds is not explicitly sent here.
-
     } catch (error: any) {
       console.error('Error en la fase PUSH de sincronización (Replace All):', error);
       toast({ title: 'Error al Enviar Cambios (Replace All)', description: error.message || 'No se pudo enviar los cambios locales.', variant: 'destructive' });
       setIsSyncing(false);
-      return; // Stop if push fails
+      return; 
     }
 
-    // --- PULL Phase (remains the same) ---
+    // --- PULL Phase (using get-all-server-data strategy) ---
     try {
-      let syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/expenses';
-      const currentLastSync = lastSyncTimestamp; 
-      if (currentLastSync) {
-        syncUrl += `?since=${currentLastSync}`;
-      }
+      const syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/get-all-server-data';
+      // No 'since' parameter needed for get-all-server-data
 
       const response = await fetch(syncUrl, {
         method: 'GET',
@@ -526,52 +526,48 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: `Error del servidor al obtener gastos (PULL): ${response.status}` }));
+        const errorData = await response.json().catch(() => ({ message: `Error del servidor al obtener datos (PULL): ${response.status}` }));
         throw new Error(errorData.message || `Error ${response.status}`);
       }
 
-      const syncResponse: { expenses: BackendExpense[], server_timestamp: string } = await response.json();
+      const syncResponse: SyncAllServerDataResponse = await response.json();
       
       const serverExpensesTransformed: Expense[] = syncResponse.expenses
-        .filter(be => !be.deleted_at) // Exclude soft-deleted items
+        .filter(be => !be.deleted_at) 
         .map(be => {
           const frontendPrice = parseFloat(be.price);
           const frontendTimestamp = safelyParseDate(be.timestamp);
 
-          // Additional check for productName
           if (isNaN(frontendPrice) || !frontendTimestamp || !isValid(frontendTimestamp) || !be.productName) {
             console.warn('Gasto inválido recibido del servidor (PULL):', be);
-            return null; // Skip invalid expense
+            return null; 
           }
           return {
-            id: String(be.id), // Server ID is primary, ensure it's string
-            product: { name: be.productName, value: 0, color: '' }, // Use productName
+            id: String(be.id), 
+            product: { name: be.productName, value: 0, color: '' }, 
             price: frontendPrice,
             category: be.category || DEFAULT_CATEGORY_KEY,
             timestamp: frontendTimestamp,
           };
         })
-        .filter((exp): exp is Expense => exp !== null) // Type guard to filter out nulls
+        .filter((exp): exp is Expense => exp !== null) 
         .sort((a, b) => (safelyParseDate(b.timestamp)!.getTime() - safelyParseDate(a.timestamp)!.getTime()));
 
 
-      setExpenses(serverExpensesTransformed); // Replace local with server data
+      setExpenses(serverExpensesTransformed); 
       
-      const syncedCategories = new Set<string>([DEFAULT_CATEGORY_KEY]);
-      serverExpensesTransformed.forEach(exp => {
-        if (exp.category && exp.category !== DEFAULT_CATEGORY_KEY) {
-          syncedCategories.add(exp.category);
-        }
-      });
-      setCategories(Array.from(syncedCategories).sort());
+      const serverCategories = syncResponse.categories.map(cat => cat.name);
+      const finalCategories = Array.from(new Set([DEFAULT_CATEGORY_KEY, ...serverCategories])).sort();
+      setCategories(finalCategories);
+      
       setLastSyncTimestamp(syncResponse.server_timestamp);
-      setDeletedServerExpenseIds([]); // Clear local deleted IDs after a successful PULL
+      setDeletedServerExpenseIds([]);
 
-      toast({ title: 'Sincronización Completada (Pull)', description: `${serverExpensesTransformed.length} gastos actualizados desde el servidor.` });
+      toast({ title: 'Sincronización Completada (Pull All)', description: `${serverExpensesTransformed.length} gastos y ${finalCategories.length} categorías actualizadas desde el servidor.` });
 
     } catch (error: any) {
-      console.error('Error en la fase PULL de sincronización:', error);
-      toast({ title: 'Error al Obtener Cambios (Pull)', description: error.message || 'No se pudo obtener datos del servidor.', variant: 'destructive' });
+      console.error('Error en la fase PULL de sincronización (Get All):', error);
+      toast({ title: 'Error al Obtener Datos Completos (Pull All)', description: error.message || 'No se pudo obtener datos del servidor.', variant: 'destructive' });
     } finally {
       setIsSyncing(false);
     }
@@ -653,7 +649,7 @@ export default function Home() {
     let maxD: Date | null = null;
     expenses.forEach(expense => {
       const current = safelyParseDate(expense.timestamp);
-      if (current && isValid(current)) { // Add isValid check here
+      if (current && isValid(current)) { 
         if (minD === null || current < minD) minD = current;
         if (maxD === null || current > maxD) maxD = current;
       }
