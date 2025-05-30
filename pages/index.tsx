@@ -50,7 +50,7 @@ type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
 type ActiveView = 'control' | 'reporting' | 'data' | 'profile';
 
 interface BackendExpense {
-  id: string;
+  id: string; // Server ID is a string, even if numeric-like
   local_id?: string | null;
   productName: string;
   price: string;
@@ -61,7 +61,7 @@ interface BackendExpense {
 }
 
 interface BackendCategory {
-  id: number;
+  id: number; // Assuming category ID from backend is number
   name: string;
 }
 
@@ -71,6 +71,14 @@ interface SyncAllServerDataResponse {
   productNames: string[];
   server_timestamp: string;
 }
+
+interface PushSyncResponseBody {
+  created_map?: Array<{ local_id: string; server_id: string }>; // server_id could be number or string from backend
+  updated_results?: Array<{ id: string; status: string; message?: string }>;
+  deleted_count?: number;
+  errors?: Array<{ id?: string; local_id?: string; message: string }>;
+}
+
 
 function MainLayout() {
   const { toast } = useToast();
@@ -95,7 +103,7 @@ function MainLayout() {
   const [selectedQuickRange, setSelectedQuickRange] = useState<QuickRangeValue>('allTime');
   const [activeView, setActiveView] = useState<ActiveView>('control');
 
-  const { isMobile, setOpenMobile, setOpen: setSidebarOpen } = useSidebar();
+  const { isMobile, setOpen: setSidebarOpen, setOpenMobile } = useSidebar();
 
 
   useEffect(() => {
@@ -127,6 +135,7 @@ function MainLayout() {
       newStart = startOfDay(subDays(today, 89));
       newEnd = endOfDay(today);
     } else if (selectedQuickRange === 'custom') {
+      // Keep existing custom dates
       return;
     }
     setStartDateFilter(newStart);
@@ -139,7 +148,7 @@ function MainLayout() {
     const newExpense: Expense = {
       ...newExpenseData,
       category: categoryToAdd,
-      id: uuidv4(),
+      id: uuidv4(), // Client-side UUID
       timestamp: new Date(),
     };
     if (categoryToAdd !== DEFAULT_CATEGORY_KEY && !categories.includes(categoryToAdd)) {
@@ -157,14 +166,14 @@ function MainLayout() {
 
   const handleDeleteExpense = (idToDelete: string) => {
     const expenseToDelete = expenses.find(exp => exp.id === idToDelete);
-    if (expenseToDelete && !isNaN(parseInt(expenseToDelete.id, 10))) {
-      setDeletedServerExpenseIds(prevIds => {
-        const serverId = expenseToDelete.id;
-        if (!prevIds.includes(serverId)) {
-          return [...prevIds, serverId];
-        }
-        return prevIds;
-      });
+    // Check if the ID is a server ID (numeric string) vs a client UUID
+    if (expenseToDelete && /^\d+$/.test(expenseToDelete.id)) {
+        setDeletedServerExpenseIds(prevIds => {
+            if (!prevIds.includes(expenseToDelete.id)) { // Ensure ID is string
+                return [...prevIds, expenseToDelete.id];
+            }
+            return prevIds;
+        });
     }
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.id !== idToDelete));
   };
@@ -208,15 +217,15 @@ function MainLayout() {
   const handleDeleteProduct = (productNameToDelete: string) => {
     const expensesToDelete = expenses.filter(expense => expense.product.name === productNameToDelete);
     expensesToDelete.forEach(expense => {
-      if (!isNaN(parseInt(expense.id, 10))) {
-        const serverId = expense.id;
-        setDeletedServerExpenseIds(prevIds => {
-          if (!prevIds.includes(serverId)) {
-            return [...prevIds, serverId];
-          }
-          return prevIds;
-        });
-      }
+        // Check if the ID is a server ID (numeric string)
+        if (/^\d+$/.test(expense.id)) {
+            setDeletedServerExpenseIds(prevIds => {
+                if (!prevIds.includes(expense.id)) { // Ensure ID is string
+                    return [...prevIds, expense.id];
+                }
+                return prevIds;
+            });
+        }
     });
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.product.name !== productNameToDelete));
     toast({
@@ -236,15 +245,15 @@ function MainLayout() {
     }
     const expensesToDelete = expenses.filter(expense => expense.category === categoryIdentifierToDelete);
     expensesToDelete.forEach(expense => {
-      if (!isNaN(parseInt(expense.id, 10))) {
-        const serverId = expense.id;
-        setDeletedServerExpenseIds(prevIds => {
-          if (!prevIds.includes(serverId)) {
-            return [...prevIds, serverId];
-          }
-          return prevIds;
-        });
-      }
+        // Check if the ID is a server ID (numeric string)
+        if (/^\d+$/.test(expense.id)) {
+            setDeletedServerExpenseIds(prevIds => {
+                if (!prevIds.includes(expense.id)) { // Ensure ID is string
+                    return [...prevIds, expense.id];
+                }
+                return prevIds;
+            });
+        }
     });
     setExpenses(prevExpenses => prevExpenses.filter(expense => expense.category !== categoryIdentifierToDelete));
     if (categories.includes(categoryIdentifierToDelete)) {
@@ -259,7 +268,7 @@ function MainLayout() {
   const handleExport = () => {
     if (!isClient) return;
     const dataToExport = expenses.map(exp => ({
-      ID_Frontend: exp.id,
+      ID_Frontend: exp.id, // Could be UUID or Server ID (as string)
       Producto: exp.product.name,
       Precio: exp.price,
       Categoria: exp.category,
@@ -341,7 +350,7 @@ function MainLayout() {
               return;
             }
             const newExpense: Expense = {
-              id: row.ID_Frontend || uuidv4(),
+              id: row.ID_Frontend || uuidv4(), // Use imported ID or generate new
               product: { name: productName, value: 0, color: '' },
               price: price,
               category: categoryName,
@@ -437,12 +446,12 @@ function MainLayout() {
   const handleClearFilters = () => {
     setSelectedProductFilter('all');
     setSelectedCategoryFilter('all');
-    setSelectedQuickRange('allTime');
+    setSelectedQuickRange('allTime'); // This will trigger the useEffect to clear dates
   };
 
   const handleDateSelect = (dateSetter: (date: Date | null) => void, date: Date | null) => {
     dateSetter(date);
-    setSelectedQuickRange('custom');
+    setSelectedQuickRange('custom'); // Switch to custom range when a date is manually picked
   };
 
   const handleLogout = async () => {
@@ -450,15 +459,18 @@ function MainLayout() {
 
     if (token) {
       try {
-        fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
+        // Inform the backend about the logout
+        await fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         });
+        // Regardless of backend response, clear client-side session
       } catch (error) {
         console.error('Error calling logout endpoint:', error);
+        // Still proceed to clear client-side session
       }
     }
 
@@ -466,13 +478,13 @@ function MainLayout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('lastSyncTimestamp');
-      localStorage.removeItem('deletedServerExpenseIds');
+      localStorage.removeItem('deletedServerExpenseIds'); // Clear this on logout
     }
     toast({
       title: 'Sesión Cerrada',
       description: 'Has cerrado sesión exitosamente.',
     });
-    router.push('/login');
+    router.push('/login'); // Redirect to login page
   };
 
 
@@ -489,53 +501,89 @@ function MainLayout() {
       return;
     }
 
+    // --- PUSH Phase ---
     try {
-      const clientExpensesPayload = expenses.map(exp => {
-        const isServerId = !isNaN(parseInt(exp.id, 10));
-        const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
-        const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
+      const createdPayload = expenses
+        .filter(exp => !/^\d+$/.test(exp.id)) // Filter for UUIDs (client-only IDs)
+        .map(exp => {
+          const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
+          const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
+          return {
+            local_id: exp.id,
+            productName: exp.product.name,
+            price: exp.price,
+            category: exp.category || DEFAULT_CATEGORY_KEY,
+            timestamp: formattedTimestamp,
+          };
+        });
 
+      const updatedPayload = expenses
+        .filter(exp => /^\d+$/.test(exp.id)) // Filter for server IDs
+        .map(exp => {
+          const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
+          const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
+          return {
+            id: exp.id, // Server ID
+            productName: exp.product.name,
+            price: exp.price,
+            category: exp.category || DEFAULT_CATEGORY_KEY,
+            timestamp: formattedTimestamp,
+          };
+        });
 
-        return {
-          id: isServerId ? exp.id : null,
-          local_id: isServerId ? null : exp.id,
-          product: exp.product.name,
-          price: exp.price,
-          category: exp.category || DEFAULT_CATEGORY_KEY,
-          timestamp: formattedTimestamp,
-        };
-      });
+      const pushData = {
+        created: createdPayload,
+        updated: updatedPayload,
+        deleted_ids: deletedServerExpenseIds, // Already string IDs
+      };
 
-      const pushResponse = await fetch('https://back.presupuesto.peryloth.com/api/sync/replace-all-client-data', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({ expenses: clientExpensesPayload }),
-      });
+      if (pushData.created.length > 0 || pushData.updated.length > 0 || pushData.deleted_ids.length > 0) {
+        const pushResponse = await fetch('https://back.presupuesto.peryloth.com/api/sync/expenses', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(pushData),
+        });
 
-      if (!pushResponse.ok) {
-        const errorData = await pushResponse.json().catch(() => ({ message: `Error al enviar cambios (PUSH): ${pushResponse.status}` }));
-        throw new Error(errorData.message || `Error ${pushResponse.status}: ${JSON.stringify(errorData)}`);
+        if (!pushResponse.ok) {
+          const errorData = await pushResponse.json().catch(() => ({ message: `Error al enviar cambios (PUSH): ${pushResponse.status}` }));
+          throw new Error(errorData.message || `Error ${pushResponse.status}: ${JSON.stringify(errorData)}`);
+        }
+
+        const pushResult: PushSyncResponseBody = await pushResponse.json();
+        
+        let newExpenses = [...expenses];
+        if (pushResult.created_map) {
+          pushResult.created_map.forEach(mapping => {
+            newExpenses = newExpenses.map(exp => 
+              exp.id === mapping.local_id ? { ...exp, id: String(mapping.server_id) } : exp
+            );
+          });
+        }
+        setExpenses(newExpenses); // Update local IDs with server IDs
+
+        toast({
+          title: 'Cambios Locales Sincronizados (PUSH)',
+          description: `${pushResult.created_map?.length || 0} creados, ${pushResult.updated_results?.filter(r => r.status === 'success').length || 0} actualizados, ${pushResult.deleted_count || 0} eliminados en el servidor.`
+        });
+        setDeletedServerExpenseIds([]); // Clear after successful push
+      } else {
+        toast({title: "Sin cambios locales para enviar (PUSH)."})
       }
 
-      const pushResult = await pushResponse.json();
-      toast({
-        title: 'Cambios Locales Enviados (Replace All)',
-        description: `${pushResult.created_count || 0} creados, ${pushResult.updated_count || 0} actualizados por el servidor.`
-      });
     } catch (error: any) {
-      console.error('Error en la fase PUSH de sincronización (Replace All):', error);
-      toast({ title: 'Error al Enviar Cambios (Replace All)', description: error.message || 'No se pudo enviar los cambios locales.', variant: 'destructive' });
+      console.error('Error en la fase PUSH de sincronización:', error);
+      toast({ title: 'Error al Enviar Cambios (PUSH)', description: error.message || 'No se pudo enviar los cambios locales.', variant: 'destructive' });
       setIsSyncing(false);
-      return;
+      return; // Stop if PUSH fails
     }
 
+    // --- PULL Phase ---
     try {
       const syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/get-all-server-data';
-
       const response = await fetch(syncUrl, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' },
@@ -549,7 +597,7 @@ function MainLayout() {
       const syncResponse: SyncAllServerDataResponse = await response.json();
 
       const serverExpensesTransformed: Expense[] = syncResponse.expenses
-        .filter(be => !be.deleted_at)
+        .filter(be => !be.deleted_at) // Filter out soft-deleted items from server
         .map(be => {
           const frontendPrice = parseFloat(be.price);
           const frontendTimestamp = safelyParseDate(be.timestamp);
@@ -559,14 +607,14 @@ function MainLayout() {
             return null;
           }
           return {
-            id: String(be.id),
-            product: { name: be.productName, value: 0, color: '' },
+            id: String(be.id), // Ensure server ID is stored as string
+            product: { name: be.productName, value: 0, color: '' }, // value and color are for chart, not from backend
             price: frontendPrice,
             category: be.category || DEFAULT_CATEGORY_KEY,
             timestamp: frontendTimestamp,
           };
         })
-        .filter((exp): exp is Expense => exp !== null)
+        .filter((exp): exp is Expense => exp !== null) // Type guard to remove nulls
         .sort((a, b) => (safelyParseDate(b.timestamp)!.getTime() - safelyParseDate(a.timestamp)!.getTime()));
 
 
@@ -577,7 +625,8 @@ function MainLayout() {
       setCategories(finalCategories);
 
       setLastSyncTimestamp(syncResponse.server_timestamp);
-      setDeletedServerExpenseIds([]);
+      // No need to filter by deletedServerExpenseIds here if PUSH was successful and PULL gives current server state.
+      // And deletedServerExpenseIds was cleared after successful PUSH.
 
       toast({ title: 'Sincronización Completada (Pull All)', description: `${serverExpensesTransformed.length} gastos y ${finalCategories.length} categorías actualizadas desde el servidor.` });
 
@@ -599,6 +648,7 @@ function MainLayout() {
     const isProductFiltered = selectedProductFilter !== 'all';
     const isCategoryFiltered = selectedCategoryFilter !== 'all';
 
+    // Only allow group deletion if ONLY product OR ONLY category is filtered, and NO date filters are active.
     const noDateFiltersActive = selectedQuickRange === 'allTime' && !startDateFilter && !endDateFilter;
 
     if (isProductFiltered && !isCategoryFiltered && noDateFiltersActive) {
@@ -657,7 +707,7 @@ function MainLayout() {
     if (!isClient || expenses.length === 0) {
       const today = new Date();
       return {
-        minExpenseDateOverall: startOfDay(subDays(today, 6)),
+        minExpenseDateOverall: startOfDay(subDays(today, 6)), // Default to last 7 days if no expenses
         maxExpenseDateOverall: endOfDay(today)
       };
     }
@@ -678,11 +728,13 @@ function MainLayout() {
     };
   }, [expenses, isClient]);
 
+  // These are the dates passed to the charts for their X-axis range.
   const graphViewStartDate = startDateFilter ?? minExpenseDateOverall;
   const graphViewEndDate = endDateFilter ?? maxExpenseDateOverall;
 
 
-  if (loadingAuth && isClient) {
+  // Loading state for initial auth check
+  if (loadingAuth && isClient) { // Show loading only if client-side and auth is still loading
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Skeleton className="h-16 w-16 rounded-full animate-spin" />
@@ -702,9 +754,9 @@ function MainLayout() {
   const handleSidebarItemClick = (view: ActiveView) => {
     setActiveView(view);
     if (isMobile) {
-      setOpenMobile(false);
+      setOpenMobile(false); // Close mobile sidebar on item click
     } else {
-      setSidebarOpen(false);
+      setSidebarOpen(false); // Collapse desktop sidebar on item click (if it's 'offcanvas' or similar)
     }
   };
 
@@ -750,9 +802,11 @@ function MainLayout() {
           </SidebarContent>
         </Sidebar>
 
+        {/* Main content area that shifts with the sidebar */}
         <SidebarInset>
+          {/* Sticky header for the main content area */}
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 sm:py-4">
-            <SidebarTrigger className="sm:hidden">
+            <SidebarTrigger className="sm:hidden"> {/* Hamburger for mobile */}
               <Menu className="h-5 w-5" />
               <span className="sr-only">Abrir menú</span>
             </SidebarTrigger>
@@ -761,6 +815,7 @@ function MainLayout() {
             </h1>
             <p className="text-sm text-muted-foreground hidden md:block">
               {activeView === 'control' && "Registra y analiza tus gastos fácilmente."}
+              {/* Add more descriptions for other views if needed */}
             </p>
           </header>
 
@@ -771,9 +826,9 @@ function MainLayout() {
                 <div className="md:col-span-1">
                   <ExpenseForm
                     onAddExpense={handleAddExpense}
-                    categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)}
+                    categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)} // Exclude default for suggestions
                     defaultCategoryKey={DEFAULT_CATEGORY_KEY}
-                    productInputRef={productInputRef}
+                    productInputRef={productInputRef} // Pass the ref here
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -789,6 +844,7 @@ function MainLayout() {
                     <CardTitle className="text-lg sm:text-xl">Filtros de Reportería</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Product and Category Filters */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
@@ -825,6 +881,7 @@ function MainLayout() {
                         </Select>
                       </div>
                     </div>
+                    {/* Date Filters */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
                       <div className="md:col-span-1">
                         <Label htmlFor="quick-range-select" className="text-xs sm:text-sm">Rango Rápido:</Label>
@@ -862,7 +919,7 @@ function MainLayout() {
                             <PopoverContent className="w-auto p-0">
                               <Calendar
                                 mode="single"
-                                selected={startDateFilter || undefined}
+                                selected={startDateFilter || undefined} // Pass undefined if null
                                 onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
                                 initialFocus
                               />
@@ -889,7 +946,7 @@ function MainLayout() {
                             <PopoverContent className="w-auto p-0">
                               <Calendar
                                 mode="single"
-                                selected={endDateFilter || undefined}
+                                selected={endDateFilter || undefined} // Pass undefined if null
                                 onSelect={(date) => handleDateSelect(setEndDateFilter, date || null)}
                                 disabled={(date) =>
                                   startDateFilter ? date < startDateFilter : false
@@ -901,6 +958,7 @@ function MainLayout() {
                         </div>
                       </div>
                     </div>
+                    {/* Clear Filters Button */}
                     <div className="flex justify-end">
                       <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
                         <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
@@ -909,35 +967,37 @@ function MainLayout() {
                   </CardContent>
                 </Card>
 
+                {/* Charts Section */}
                 <ExpenseCharts
-                  expenses={filteredExpenses}
-                  startDate={graphViewStartDate}
-                  endDate={graphViewEndDate}
+                  expenses={filteredExpenses} // Pass globally filtered expenses
+                  startDate={graphViewStartDate} // Pass calculated start date for chart X-axis
+                  endDate={graphViewEndDate}     // Pass calculated end date for chart X-axis
                 />
                 <CategoryCharts
-                  expenses={filteredExpenses}
+                  expenses={filteredExpenses} // Pass globally filtered expenses
                   defaultCategoryKey={DEFAULT_CATEGORY_KEY}
                 />
 
+                {/* History List Section */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg sm:text-xl">{historyListTitle()}</CardTitle>
                     <CardDescription>{historyListCaption()}</CardDescription>
                   </CardHeader>
-                  <CardContent className="px-0 sm:px-6 sm:pb-6">
+                  <CardContent className="px-0 sm:px-6 sm:pb-6"> {/* Adjusted padding for better table view */}
                     {isClient ? (
                       <ExpenseList
                         expenses={filteredExpenses}
                         onDeleteExpense={handleDeleteExpense}
                         onEditExpense={handleEditExpense}
-                        groupName={activeGroupName}
-                        onDeleteGroup={onDeleteActiveGroup}
-                        groupTypeLabel={activeGroupType}
+                        groupName={activeGroupName} // Pass active group name for context
+                        onDeleteGroup={onDeleteActiveGroup} // Pass the correct delete handler
+                        groupTypeLabel={activeGroupType} // Pass the type of group ('product' or 'category')
                         groupDisplayName={activeGroupDisplayName}
                         defaultCategoryKey={DEFAULT_CATEGORY_KEY}
                       />
                     ) : (
-                      <Skeleton className="h-64 w-full" />
+                      <Skeleton className="h-64 w-full" /> // Placeholder for loading
                     )}
                   </CardContent>
                 </Card>
@@ -956,7 +1016,7 @@ function MainLayout() {
                     ref={fileInputRef}
                     onChange={handleFileChange}
                     accept=".csv"
-                    style={{ display: 'none' }}
+                    style={{ display: 'none' }} // Hide the default input
                     id="import-csv-input"
                   />
                   {isClient ? (
@@ -1007,7 +1067,7 @@ function MainLayout() {
                         <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
                       </Button>
                     </div>
-                  ) : isClient ? (
+                  ) : isClient ? ( // User is not logged in, but client has loaded
                     <div className="space-y-3 text-center sm:text-left">
                       <p>Inicia sesión o regístrate para sincronizar tus datos entre dispositivos.</p>
                       <p className="text-xs text-muted-foreground">
@@ -1017,7 +1077,7 @@ function MainLayout() {
                         <UserCircle className="mr-2 h-4 w-4" /> Ir a Iniciar Sesión / Registrarse
                       </Button>
                     </div>
-                  ) : (
+                  ) : ( // Still loading or server-side rendering (skeleton state)
                     <div className="space-y-3">
                       <Skeleton className="h-8 w-3/4" />
                       <Skeleton className="h-6 w-1/2" />
@@ -1031,6 +1091,7 @@ function MainLayout() {
           </main>
         </SidebarInset>
 
+        {/* Edit Expense Dialog */}
         {editingExpense && isClient && (
           <EditExpenseDialog
             expense={editingExpense}
@@ -1044,6 +1105,7 @@ function MainLayout() {
   );
 }
 
+// Wrap MainLayout with SidebarProvider
 export default function Home() {
   return (
     <SidebarProvider>
@@ -1051,5 +1113,3 @@ export default function Home() {
     </SidebarProvider>
   );
 }
-
-    
