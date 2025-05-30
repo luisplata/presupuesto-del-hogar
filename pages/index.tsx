@@ -21,7 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Upload, Download, Calendar as CalendarIcon, FilterX, LogOut, UserCircle } from 'lucide-react';
+import { Upload, Download, Calendar as CalendarIcon, FilterX, LogOut, UserCircle, RefreshCw } from 'lucide-react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -355,26 +355,32 @@ export default function Home() {
   const handleClearFilters = () => {
     setSelectedProductFilter('all');
     setSelectedCategoryFilter('all');
-    // setStartDateFilter(null); // Now handled by quick range
-    // setEndDateFilter(null);   // Now handled by quick range
-    setSelectedQuickRange('allTime'); // This will clear date filters
+    setSelectedQuickRange('allTime'); 
   };
   
   const handleDateSelect = (dateSetter: (date: Date | null) => void, date: Date | null) => {
     dateSetter(date);
-    setSelectedQuickRange('custom'); // Switch to custom when a date is manually picked
+    setSelectedQuickRange('custom'); 
   };
 
   const handleLogout = () => {
-    setCurrentUser(null); // Clear user from context/localStorage
+    setCurrentUser(null); 
     toast({
       title: 'Sesión Cerrada',
       description: 'Has cerrado sesión exitosamente.',
     });
-    router.push('/login'); // O a la página principal, que redirigirá a login si es necesario
+    router.push('/login'); 
   };
 
-  // Logic to determine which group delete button to show in ExpenseList
+  const handleSyncData = () => {
+    // Placeholder for data sync logic
+    toast({
+      title: 'Sincronización (Simulada)',
+      description: '¡Tus datos se están sincronizando! (Esta es una función de marcador de posición)',
+    });
+  };
+
+
   let activeGroupType: 'product' | 'category' | undefined = undefined;
   let activeGroupName: string | undefined = undefined;
   let activeGroupDisplayName: string | undefined = undefined;
@@ -383,8 +389,8 @@ export default function Home() {
   if (isClient) {
     const isProductFiltered = selectedProductFilter !== 'all';
     const isCategoryFiltered = selectedCategoryFilter !== 'all';
-    // Only enable group delete if ONLY product OR ONLY category is filtered AND no date filters are active
-    const noDateFiltersActive = !startDateFilter && !endDateFilter; // Or selectedQuickRange === 'allTime'
+    
+    const noDateFiltersActive = selectedQuickRange === 'allTime' && !startDateFilter && !endDateFilter;
 
     if (isProductFiltered && !isCategoryFiltered && noDateFiltersActive) {
         activeGroupType = 'product';
@@ -438,11 +444,9 @@ export default function Home() {
     return `${baseCaption}${dateRangeString}. Total: ${formatCurrency(totalOfFilteredExpenses)}`;
   };
   
-  // Determine the overall min and max dates from ALL expenses for chart rendering
   const { minExpenseDateOverall, maxExpenseDateOverall } = useMemo(() => {
     if (!isClient || expenses.length === 0) {
       const today = new Date();
-      // Default to last 7 days if no expenses
       return { 
         minExpenseDateOverall: startOfDay(subDays(today, 6)), 
         maxExpenseDateOverall: endOfDay(today) 
@@ -457,7 +461,7 @@ export default function Home() {
         if (maxD === null || current > maxD) maxD = current;
       }
     });
-    const fallbackStart = startOfDay(subDays(new Date(), 6)); // Fallback if no valid dates found
+    const fallbackStart = startOfDay(subDays(new Date(), 6)); 
     const fallbackEnd = endOfDay(new Date());
     return { 
       minExpenseDateOverall: minD ? startOfDay(minD) : fallbackStart,
@@ -465,16 +469,14 @@ export default function Home() {
     };
   }, [expenses, isClient]);
 
-  // Dates to pass to ExpenseCharts for its X-axis range
-  // If a filter is active, use it. Otherwise, use the overall min/max.
   const graphViewStartDate = startDateFilter ?? minExpenseDateOverall;
   const graphViewEndDate = endDateFilter ?? maxExpenseDateOverall;
 
 
-  if (loadingAuth && isClient) { // Show loading only if client has mounted and auth is still loading
+  if (loadingAuth && isClient) { 
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <Skeleton className="h-16 w-16 rounded-full animate-spin" /> {/* Simple spinner */}
+        <Skeleton className="h-16 w-16 rounded-full animate-spin" /> 
         <p className="ml-4 text-lg">Cargando...</p>
       </div>
     );
@@ -493,11 +495,11 @@ export default function Home() {
         </header>
 
         <Tabs defaultValue="control" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-6"> {/* Updated to 4 columns */}
+          <TabsList className="grid w-full grid-cols-4 mb-6"> 
             <TabsTrigger value="control">Control de gastos</TabsTrigger>
             <TabsTrigger value="reporting">Reportería</TabsTrigger>
             <TabsTrigger value="data">Exportar/Importar</TabsTrigger>
-            <TabsTrigger value="profile">Perfil</TabsTrigger> {/* New Profile Tab */}
+            <TabsTrigger value="profile">Perfil</TabsTrigger> 
           </TabsList>
 
           <TabsContent value="control">
@@ -523,7 +525,6 @@ export default function Home() {
                   <CardTitle className="text-lg sm:text-xl">Filtros de Reportería</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Product and Category Filters */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
@@ -560,7 +561,6 @@ export default function Home() {
                       </Select>
                     </div>
                   </div>
-                  {/* Date Filters */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
                     <div className="md:col-span-1">
                       <Label htmlFor="quick-range-select" className="text-xs sm:text-sm">Rango Rápido:</Label>
@@ -598,7 +598,7 @@ export default function Home() {
                             <PopoverContent className="w-auto p-0">
                               <Calendar
                                 mode="single"
-                                selected={startDateFilter || undefined} // Pass undefined if null for better component handling
+                                selected={startDateFilter || undefined} 
                                 onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
                                 initialFocus
                               />
@@ -637,7 +637,6 @@ export default function Home() {
                         </div>
                     </div>
                   </div>
-                   {/* Clear Filters Button */}
                    <div className="flex justify-end">
                         <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
                             <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
@@ -674,7 +673,7 @@ export default function Home() {
                       defaultCategoryKey={DEFAULT_CATEGORY_KEY}
                     />
                   ) : (
-                     <Skeleton className="h-64 w-full" /> // Skeleton for list content
+                     <Skeleton className="h-64 w-full" /> 
                   )}
                 </CardContent>
               </Card>
@@ -715,38 +714,42 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-          {/* Profile Tab Content */}
           <TabsContent value="profile">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <UserCircle className="mr-2 h-6 w-6" /> Perfil de Usuario
+                  <UserCircle className="mr-2 h-6 w-6" /> Perfil y Sincronización
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {isClient && currentUser ? (
                   <div className="space-y-3">
                     <p className="text-lg">
-                      Bienvenido, <span className="font-semibold">{currentUser.name || currentUser.email}</span>!
+                      ¡Bienvenido de nuevo, <span className="font-semibold">{currentUser.name || currentUser.email}</span>!
                     </p>
                     <p className="text-sm text-muted-foreground">Email: {currentUser.email}</p>
-                    {/* Add more profile details or actions here */}
+                    <Button onClick={handleSyncData} className="w-full sm:w-auto">
+                      <RefreshCw className="mr-2 h-4 w-4" /> Sincronizar Datos (Simulado)
+                    </Button>
                     <Button onClick={handleLogout} variant="outline" className="w-full sm:w-auto">
                       <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
                     </Button>
                   </div>
-                ) : isClient ? ( // User is not logged in, but client has mounted
+                ) : isClient ? ( 
                   <div className="space-y-3 text-center sm:text-left">
-                    <p>Debes iniciar sesión para ver tu perfil y gestionar tus datos.</p>
+                    <p>Inicia sesión o regístrate para sincronizar tus datos entre dispositivos.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Puedes seguir usando la aplicación localmente sin una cuenta.
+                    </p>
                     <Button onClick={() => router.push('/login')} className="w-full sm:w-auto">
-                      <UserCircle className="mr-2 h-4 w-4" /> Ir a Iniciar Sesión
+                      <UserCircle className="mr-2 h-4 w-4" /> Ir a Iniciar Sesión / Registrarse
                     </Button>
                   </div>
                 ) : (
-                  // Loading state (client not yet mounted or auth still loading)
                   <div className="space-y-3">
                     <Skeleton className="h-8 w-3/4" />
                     <Skeleton className="h-6 w-1/2" />
+                    <Skeleton className="h-10 w-full sm:w-[220px]" />
                     <Skeleton className="h-10 w-full sm:w-[150px]" />
                   </div>
                 )}
