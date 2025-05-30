@@ -50,7 +50,7 @@ type QuickRangeValue = 'allTime' | '7days' | '30days' | '90days' | 'custom';
 type ActiveView = 'control' | 'reporting' | 'data' | 'profile';
 
 interface BackendExpense {
-  id: string; // Server ID is a string, even if numeric-like
+  id: string; 
   local_id?: string | null;
   productName: string;
   price: string;
@@ -61,7 +61,7 @@ interface BackendExpense {
 }
 
 interface BackendCategory {
-  id: number; // Assuming category ID from backend is number
+  id: number; 
   name: string;
 }
 
@@ -73,7 +73,7 @@ interface SyncAllServerDataResponse {
 }
 
 interface PushSyncResponseBody {
-  created_map?: Array<{ local_id: string; server_id: string }>; // server_id could be number or string from backend
+  created_map?: Array<{ local_id: string; server_id: string }>; 
   updated_results?: Array<{ id: string; status: string; message?: string }>;
   deleted_count?: number;
   errors?: Array<{ id?: string; local_id?: string; message: string }>;
@@ -166,10 +166,9 @@ function MainLayout() {
 
   const handleDeleteExpense = (idToDelete: string) => {
     const expenseToDelete = expenses.find(exp => exp.id === idToDelete);
-    // Check if the ID is a server ID (numeric string) vs a client UUID
     if (expenseToDelete && /^\d+$/.test(expenseToDelete.id)) {
         setDeletedServerExpenseIds(prevIds => {
-            if (!prevIds.includes(expenseToDelete.id)) { // Ensure ID is string
+            if (!prevIds.includes(expenseToDelete.id)) { 
                 return [...prevIds, expenseToDelete.id];
             }
             return prevIds;
@@ -217,10 +216,9 @@ function MainLayout() {
   const handleDeleteProduct = (productNameToDelete: string) => {
     const expensesToDelete = expenses.filter(expense => expense.product.name === productNameToDelete);
     expensesToDelete.forEach(expense => {
-        // Check if the ID is a server ID (numeric string)
         if (/^\d+$/.test(expense.id)) {
             setDeletedServerExpenseIds(prevIds => {
-                if (!prevIds.includes(expense.id)) { // Ensure ID is string
+                if (!prevIds.includes(expense.id)) {
                     return [...prevIds, expense.id];
                 }
                 return prevIds;
@@ -245,10 +243,9 @@ function MainLayout() {
     }
     const expensesToDelete = expenses.filter(expense => expense.category === categoryIdentifierToDelete);
     expensesToDelete.forEach(expense => {
-        // Check if the ID is a server ID (numeric string)
         if (/^\d+$/.test(expense.id)) {
             setDeletedServerExpenseIds(prevIds => {
-                if (!prevIds.includes(expense.id)) { // Ensure ID is string
+                if (!prevIds.includes(expense.id)) { 
                     return [...prevIds, expense.id];
                 }
                 return prevIds;
@@ -268,7 +265,7 @@ function MainLayout() {
   const handleExport = () => {
     if (!isClient) return;
     const dataToExport = expenses.map(exp => ({
-      ID_Frontend: exp.id, // Could be UUID or Server ID (as string)
+      ID_Frontend: exp.id, 
       Producto: exp.product.name,
       Precio: exp.price,
       Categoria: exp.category,
@@ -350,7 +347,7 @@ function MainLayout() {
               return;
             }
             const newExpense: Expense = {
-              id: row.ID_Frontend || uuidv4(), // Use imported ID or generate new
+              id: row.ID_Frontend || uuidv4(), 
               product: { name: productName, value: 0, color: '' },
               price: price,
               category: categoryName,
@@ -446,12 +443,12 @@ function MainLayout() {
   const handleClearFilters = () => {
     setSelectedProductFilter('all');
     setSelectedCategoryFilter('all');
-    setSelectedQuickRange('allTime'); // This will trigger the useEffect to clear dates
+    setSelectedQuickRange('allTime'); 
   };
 
   const handleDateSelect = (dateSetter: (date: Date | null) => void, date: Date | null) => {
     dateSetter(date);
-    setSelectedQuickRange('custom'); // Switch to custom range when a date is manually picked
+    setSelectedQuickRange('custom'); 
   };
 
   const handleLogout = async () => {
@@ -459,7 +456,6 @@ function MainLayout() {
 
     if (token) {
       try {
-        // Inform the backend about the logout
         await fetch('https://back.presupuesto.peryloth.com/api/auth/logout', {
           method: 'POST',
           headers: {
@@ -467,10 +463,8 @@ function MainLayout() {
             'Content-Type': 'application/json',
           },
         });
-        // Regardless of backend response, clear client-side session
       } catch (error) {
         console.error('Error calling logout endpoint:', error);
-        // Still proceed to clear client-side session
       }
     }
 
@@ -478,13 +472,13 @@ function MainLayout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('lastSyncTimestamp');
-      localStorage.removeItem('deletedServerExpenseIds'); // Clear this on logout
+      localStorage.removeItem('deletedServerExpenseIds');
     }
     toast({
       title: 'Sesión Cerrada',
       description: 'Has cerrado sesión exitosamente.',
     });
-    router.push('/login'); // Redirect to login page
+    router.push('/login'); 
   };
 
 
@@ -501,10 +495,9 @@ function MainLayout() {
       return;
     }
 
-    // --- PUSH Phase ---
     try {
       const createdPayload = expenses
-        .filter(exp => !/^\d+$/.test(exp.id)) // Filter for UUIDs (client-only IDs)
+        .filter(exp => !/^\d+$/.test(exp.id)) 
         .map(exp => {
           const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
           const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -518,12 +511,12 @@ function MainLayout() {
         });
 
       const updatedPayload = expenses
-        .filter(exp => /^\d+$/.test(exp.id)) // Filter for server IDs
+        .filter(exp => /^\d+$/.test(exp.id)) 
         .map(exp => {
           const dateToFormat = exp.timestamp instanceof Date ? exp.timestamp : new Date(exp.timestamp);
           const formattedTimestamp = isValid(dateToFormat) ? formatDateFns(dateToFormat, 'yyyy-MM-dd HH:mm:ss') : new Date().toISOString().slice(0, 19).replace('T', ' ');
           return {
-            id: exp.id, // Server ID
+            id: exp.id, 
             productName: exp.product.name,
             price: exp.price,
             category: exp.category || DEFAULT_CATEGORY_KEY,
@@ -534,7 +527,7 @@ function MainLayout() {
       const pushData = {
         created: createdPayload,
         updated: updatedPayload,
-        deleted_ids: deletedServerExpenseIds, // Already string IDs
+        deleted_ids: deletedServerExpenseIds,
       };
 
       if (pushData.created.length > 0 || pushData.updated.length > 0 || pushData.deleted_ids.length > 0) {
@@ -563,13 +556,13 @@ function MainLayout() {
             );
           });
         }
-        setExpenses(newExpenses); // Update local IDs with server IDs
+        setExpenses(newExpenses); 
 
         toast({
           title: 'Cambios Locales Sincronizados (PUSH)',
           description: `${pushResult.created_map?.length || 0} creados, ${pushResult.updated_results?.filter(r => r.status === 'success').length || 0} actualizados, ${pushResult.deleted_count || 0} eliminados en el servidor.`
         });
-        setDeletedServerExpenseIds([]); // Clear after successful push
+        setDeletedServerExpenseIds([]); 
       } else {
         toast({title: "Sin cambios locales para enviar (PUSH)."})
       }
@@ -578,10 +571,9 @@ function MainLayout() {
       console.error('Error en la fase PUSH de sincronización:', error);
       toast({ title: 'Error al Enviar Cambios (PUSH)', description: error.message || 'No se pudo enviar los cambios locales.', variant: 'destructive' });
       setIsSyncing(false);
-      return; // Stop if PUSH fails
+      return; 
     }
 
-    // --- PULL Phase ---
     try {
       const syncUrl = 'https://back.presupuesto.peryloth.com/api/sync/get-all-server-data';
       const response = await fetch(syncUrl, {
@@ -597,7 +589,7 @@ function MainLayout() {
       const syncResponse: SyncAllServerDataResponse = await response.json();
 
       const serverExpensesTransformed: Expense[] = syncResponse.expenses
-        .filter(be => !be.deleted_at) // Filter out soft-deleted items from server
+        .filter(be => !be.deleted_at) 
         .map(be => {
           const frontendPrice = parseFloat(be.price);
           const frontendTimestamp = safelyParseDate(be.timestamp);
@@ -607,14 +599,14 @@ function MainLayout() {
             return null;
           }
           return {
-            id: String(be.id), // Ensure server ID is stored as string
-            product: { name: be.productName, value: 0, color: '' }, // value and color are for chart, not from backend
+            id: String(be.id), 
+            product: { name: be.productName, value: 0, color: '' }, 
             price: frontendPrice,
             category: be.category || DEFAULT_CATEGORY_KEY,
             timestamp: frontendTimestamp,
           };
         })
-        .filter((exp): exp is Expense => exp !== null) // Type guard to remove nulls
+        .filter((exp): exp is Expense => exp !== null) 
         .sort((a, b) => (safelyParseDate(b.timestamp)!.getTime() - safelyParseDate(a.timestamp)!.getTime()));
 
 
@@ -625,9 +617,7 @@ function MainLayout() {
       setCategories(finalCategories);
 
       setLastSyncTimestamp(syncResponse.server_timestamp);
-      // No need to filter by deletedServerExpenseIds here if PUSH was successful and PULL gives current server state.
-      // And deletedServerExpenseIds was cleared after successful PUSH.
-
+      
       toast({ title: 'Sincronización Completada (Pull All)', description: `${serverExpensesTransformed.length} gastos y ${finalCategories.length} categorías actualizadas desde el servidor.` });
 
     } catch (error: any) {
@@ -648,7 +638,6 @@ function MainLayout() {
     const isProductFiltered = selectedProductFilter !== 'all';
     const isCategoryFiltered = selectedCategoryFilter !== 'all';
 
-    // Only allow group deletion if ONLY product OR ONLY category is filtered, and NO date filters are active.
     const noDateFiltersActive = selectedQuickRange === 'allTime' && !startDateFilter && !endDateFilter;
 
     if (isProductFiltered && !isCategoryFiltered && noDateFiltersActive) {
@@ -707,7 +696,7 @@ function MainLayout() {
     if (!isClient || expenses.length === 0) {
       const today = new Date();
       return {
-        minExpenseDateOverall: startOfDay(subDays(today, 6)), // Default to last 7 days if no expenses
+        minExpenseDateOverall: startOfDay(subDays(today, 6)), 
         maxExpenseDateOverall: endOfDay(today)
       };
     }
@@ -728,13 +717,11 @@ function MainLayout() {
     };
   }, [expenses, isClient]);
 
-  // These are the dates passed to the charts for their X-axis range.
   const graphViewStartDate = startDateFilter ?? minExpenseDateOverall;
   const graphViewEndDate = endDateFilter ?? maxExpenseDateOverall;
 
 
-  // Loading state for initial auth check
-  if (loadingAuth && isClient) { // Show loading only if client-side and auth is still loading
+  if (loadingAuth && isClient) { 
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Skeleton className="h-16 w-16 rounded-full animate-spin" />
@@ -754,9 +741,9 @@ function MainLayout() {
   const handleSidebarItemClick = (view: ActiveView) => {
     setActiveView(view);
     if (isMobile) {
-      setOpenMobile(false); // Close mobile sidebar on item click
+      setOpenMobile(false); 
     } else {
-      setSidebarOpen(false); // Collapse desktop sidebar on item click (if it's 'offcanvas' or similar)
+      setSidebarOpen(false); 
     }
   };
 
@@ -768,7 +755,7 @@ function MainLayout() {
         <meta name="description" content="Registra y analiza tus gastos fácilmente." />
       </Head>
       
-        <Sidebar>
+        <Sidebar collapsible={isMobile ? "offcanvas" : "none"}>
           <SidebarHeader className="p-4">
             <h2 className="text-xl font-semibold text-sidebar-foreground">Menú Principal</h2>
           </SidebarHeader>
@@ -802,11 +789,9 @@ function MainLayout() {
           </SidebarContent>
         </Sidebar>
 
-        {/* Main content area that shifts with the sidebar */}
         <SidebarInset>
-          {/* Sticky header for the main content area */}
           <header className="sticky top-0 z-10 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 sm:py-4">
-            <SidebarTrigger className="sm:hidden"> {/* Hamburger for mobile */}
+            <SidebarTrigger className="sm:hidden"> 
               <Menu className="h-5 w-5" />
               <span className="sr-only">Abrir menú</span>
             </SidebarTrigger>
@@ -815,7 +800,6 @@ function MainLayout() {
             </h1>
             <p className="text-sm text-muted-foreground hidden md:block">
               {activeView === 'control' && "Registra y analiza tus gastos fácilmente."}
-              {/* Add more descriptions for other views if needed */}
             </p>
           </header>
 
@@ -826,9 +810,9 @@ function MainLayout() {
                 <div className="md:col-span-1">
                   <ExpenseForm
                     onAddExpense={handleAddExpense}
-                    categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)} // Exclude default for suggestions
+                    categories={categories.filter(cat => cat !== DEFAULT_CATEGORY_KEY)} 
                     defaultCategoryKey={DEFAULT_CATEGORY_KEY}
-                    productInputRef={productInputRef} // Pass the ref here
+                    productInputRef={productInputRef} 
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -844,7 +828,6 @@ function MainLayout() {
                     <CardTitle className="text-lg sm:text-xl">Filtros de Reportería</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Product and Category Filters */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="product-filter-select" className="text-xs sm:text-sm">Filtrar por Producto:</Label>
@@ -881,7 +864,6 @@ function MainLayout() {
                         </Select>
                       </div>
                     </div>
-                    {/* Date Filters */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 items-end">
                       <div className="md:col-span-1">
                         <Label htmlFor="quick-range-select" className="text-xs sm:text-sm">Rango Rápido:</Label>
@@ -919,7 +901,7 @@ function MainLayout() {
                             <PopoverContent className="w-auto p-0">
                               <Calendar
                                 mode="single"
-                                selected={startDateFilter || undefined} // Pass undefined if null
+                                selected={startDateFilter || undefined} 
                                 onSelect={(date) => handleDateSelect(setStartDateFilter, date || null)}
                                 initialFocus
                               />
@@ -946,7 +928,7 @@ function MainLayout() {
                             <PopoverContent className="w-auto p-0">
                               <Calendar
                                 mode="single"
-                                selected={endDateFilter || undefined} // Pass undefined if null
+                                selected={endDateFilter || undefined} 
                                 onSelect={(date) => handleDateSelect(setEndDateFilter, date || null)}
                                 disabled={(date) =>
                                   startDateFilter ? date < startDateFilter : false
@@ -958,7 +940,6 @@ function MainLayout() {
                         </div>
                       </div>
                     </div>
-                    {/* Clear Filters Button */}
                     <div className="flex justify-end">
                       <Button onClick={handleClearFilters} variant="outline" className="w-full sm:w-auto mt-2 sm:mt-0" disabled={!isClient}>
                         <FilterX className="mr-2 h-4 w-4" /> Limpiar Filtros
@@ -967,37 +948,35 @@ function MainLayout() {
                   </CardContent>
                 </Card>
 
-                {/* Charts Section */}
                 <ExpenseCharts
-                  expenses={filteredExpenses} // Pass globally filtered expenses
-                  startDate={graphViewStartDate} // Pass calculated start date for chart X-axis
-                  endDate={graphViewEndDate}     // Pass calculated end date for chart X-axis
+                  expenses={filteredExpenses} 
+                  startDate={graphViewStartDate} 
+                  endDate={graphViewEndDate}     
                 />
                 <CategoryCharts
-                  expenses={filteredExpenses} // Pass globally filtered expenses
+                  expenses={filteredExpenses} 
                   defaultCategoryKey={DEFAULT_CATEGORY_KEY}
                 />
 
-                {/* History List Section */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg sm:text-xl">{historyListTitle()}</CardTitle>
                     <CardDescription>{historyListCaption()}</CardDescription>
                   </CardHeader>
-                  <CardContent className="px-0 sm:px-6 sm:pb-6"> {/* Adjusted padding for better table view */}
+                  <CardContent className="px-0 sm:px-6 sm:pb-6"> 
                     {isClient ? (
                       <ExpenseList
                         expenses={filteredExpenses}
                         onDeleteExpense={handleDeleteExpense}
                         onEditExpense={handleEditExpense}
-                        groupName={activeGroupName} // Pass active group name for context
-                        onDeleteGroup={onDeleteActiveGroup} // Pass the correct delete handler
-                        groupTypeLabel={activeGroupType} // Pass the type of group ('product' or 'category')
+                        groupName={activeGroupName} 
+                        onDeleteGroup={onDeleteActiveGroup} 
+                        groupTypeLabel={activeGroupType} 
                         groupDisplayName={activeGroupDisplayName}
                         defaultCategoryKey={DEFAULT_CATEGORY_KEY}
                       />
                     ) : (
-                      <Skeleton className="h-64 w-full" /> // Placeholder for loading
+                      <Skeleton className="h-64 w-full" /> 
                     )}
                   </CardContent>
                 </Card>
@@ -1016,7 +995,7 @@ function MainLayout() {
                     ref={fileInputRef}
                     onChange={handleFileChange}
                     accept=".csv"
-                    style={{ display: 'none' }} // Hide the default input
+                    style={{ display: 'none' }} 
                     id="import-csv-input"
                   />
                   {isClient ? (
@@ -1067,7 +1046,7 @@ function MainLayout() {
                         <LogOut className="mr-2 h-4 w-4" /> Cerrar Sesión
                       </Button>
                     </div>
-                  ) : isClient ? ( // User is not logged in, but client has loaded
+                  ) : isClient ? ( 
                     <div className="space-y-3 text-center sm:text-left">
                       <p>Inicia sesión o regístrate para sincronizar tus datos entre dispositivos.</p>
                       <p className="text-xs text-muted-foreground">
@@ -1077,7 +1056,7 @@ function MainLayout() {
                         <UserCircle className="mr-2 h-4 w-4" /> Ir a Iniciar Sesión / Registrarse
                       </Button>
                     </div>
-                  ) : ( // Still loading or server-side rendering (skeleton state)
+                  ) : ( 
                     <div className="space-y-3">
                       <Skeleton className="h-8 w-3/4" />
                       <Skeleton className="h-6 w-1/2" />
@@ -1091,7 +1070,6 @@ function MainLayout() {
           </main>
         </SidebarInset>
 
-        {/* Edit Expense Dialog */}
         {editingExpense && isClient && (
           <EditExpenseDialog
             expense={editingExpense}
@@ -1105,11 +1083,12 @@ function MainLayout() {
   );
 }
 
-// Wrap MainLayout with SidebarProvider
 export default function Home() {
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={true}>
       <MainLayout />
     </SidebarProvider>
   );
 }
+
+    
